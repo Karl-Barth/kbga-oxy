@@ -13,7 +13,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 
 VERSION="1.1.0"
-OXY_MIN="22.0"
+OXY_MIN="22.0+"
 ID="ch.kr.kbga.oxy"
 NAME="kbga-oxy"
 AUTHOR="K-R / KBGA"

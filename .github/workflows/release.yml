@@ -70,7 +70,7 @@ jobs:
             printf '%s\n' '    <xt:extension id="ch.kr.kbga.oxy">'
             printf '        <xt:location href="%s"/>\n' "$ZIP_URL"
             printf '        <xt:version>%s</xt:version>\n' "$V"
-            printf '%s\n' '        <xt:oxy_version>22.0</xt:oxy_version>'
+            printf '%s\n' '        <xt:oxy_version>22.0+</xt:oxy_version>'
             printf '%s\n' '        <xt:type>plugin</xt:type>'
             printf '%s\n' '        <xt:author>K-R / KBGA</xt:author>'
             printf '%s\n' '        <xt:name>kbga-oxy</xt:name>'
