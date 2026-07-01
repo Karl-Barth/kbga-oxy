@@ -1,0 +1,6 @@
+build/
+dist/
+target/
+lib/*.jar
+.DS_Store
+.claude

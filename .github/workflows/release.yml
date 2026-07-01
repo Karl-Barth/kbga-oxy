@@ -1,0 +1,90 @@
+name: Release
+
+# Build the add-on and publish it as a GitHub Release whenever a v* tag is pushed.
+#
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# oXygen cannot be redistributed, so CI compiles against the small compile-only API
+# stubs in ci/oxygen-stubs/ (signatures match the real oXygen classes; the real ones
+# are provided by oXygen at runtime). The local ./build.sh uses the real oxygen.jar
+# and remains the source of truth — run it + ./test/run.sh before tagging.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Derive version from tag
+        id: v
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build add-on
+        env:
+          V: ${{ steps.v.outputs.version }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+
+          # Keep the plugin element's version in sync with the tag.
+          # Anchored to start-of-line so the <?xml version="1.0"?> declaration is untouched.
+          sed -i "s/^\( *\)version=\"[^\"]*\"/\1version=\"$V\"/" plugin.xml
+
+          # Compile the API stubs, then the plugin against them (Java 8 bytecode).
+          mkdir -p build/stubs build/classes
+          find ci/oxygen-stubs -name '*.java' > build/stub-sources.txt
+          javac -d build/stubs @build/stub-sources.txt
+          # CI runs JDK 8, so bytecode is Java 8 natively — no --release flag needed
+          # (JDK 8 javac does not support --release).
+          find src/main/java -name '*.java' > build/sources.txt
+          javac -encoding UTF-8 -cp build/stubs -d build/classes @build/sources.txt
+
+          # Package the plugin folder + zip.
+          PKG="kbga-oxy-$V"
+          mkdir -p "dist/$PKG/lib"
+          cp plugin.xml "dist/$PKG/plugin.xml"
+          # Classic jar syntax — JDK 8's jar tool lacks the --create/--file long options.
+          jar cf "dist/$PKG/lib/kbga-oxy-$V.jar" -C build/classes .
+          (cd dist && zip -r -q "$PKG.zip" "$PKG")
+
+          # Add-on descriptor pointing at this release's zip asset (printf avoids
+          # heredoc-indentation pitfalls inside the YAML run block).
+          ZIP_URL="$SERVER/$REPO/releases/download/v$V/$PKG.zip"
+          {
+            printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>'
+            printf '%s\n' '<xt:extensions xmlns:xt="http://www.oxygenxml.com/ns/extension">'
+            printf '%s\n' '    <xt:extension id="ch.kr.kbga.oxy">'
+            printf '        <xt:location href="%s"/>\n' "$ZIP_URL"
+            printf '        <xt:version>%s</xt:version>\n' "$V"
+            printf '%s\n' '        <xt:oxy_version>22.0</xt:oxy_version>'
+            printf '%s\n' '        <xt:type>plugin</xt:type>'
+            printf '%s\n' '        <xt:author>K-R / KBGA</xt:author>'
+            printf '%s\n' '        <xt:name>kbga-oxy</xt:name>'
+            printf '%s\n' '        <xt:description><html xmlns="http://www.w3.org/1999/xhtml"><body>'
+            printf '%s\n' '            <p>Sucht Akteure, Orte, Literatur und Lieder live in der KBGA-Metadatenbank'
+            printf '%s\n' '            und schreibt die id in das passende Attribut (ref/corresp) des Elements unter dem Cursor.</p>'
+            printf '%s\n' '        </body></html></xt:description>'
+            printf '%s\n' '    </xt:extension>'
+            printf '%s\n' '</xt:extensions>'
+          } > dist/updateSite.xml
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/kbga-oxy-${{ steps.v.outputs.version }}.zip
+            dist/updateSite.xml

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ch.kr.kbga</groupId>
+    <artifactId>kbga-oxy</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    <name>kbga-oxy</name>
+
+    <!--
+      Optional Maven build. The simplest path is ./build.sh (no network needed).
+      This pom references the locally installed oxygen.jar via a system-scoped
+      dependency, so no Oxygen artifact has to be downloaded.
+      Override the install dir with:  -Doxygen.dir="/path/to/Oxygen XML Editor"
+    -->
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>8</maven.compiler.release>
+        <oxygen.dir>/Applications/Oxygen XML Editor</oxygen.dir>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.oxygenxml</groupId>
+            <artifactId>oxygen</artifactId>
+            <version>22.0</version>
+            <scope>system</scope>
+            <systemPath>${oxygen.dir}/lib/oxygen.jar</systemPath>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>kbga-oxy-${project.version}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
