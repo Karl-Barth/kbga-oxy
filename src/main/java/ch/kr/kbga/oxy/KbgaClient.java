@@ -126,7 +126,7 @@ final class KbgaClient {
             id = ((Number) idO).longValue();
         }
         return new KbgaEntity(id, fullId, label(register, m), type(register, m),
-                detail(register, m), register);
+                detail(register, m), register, names(register, m));
     }
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -155,9 +155,48 @@ final class KbgaClient {
                 id = ((Number) idO).longValue();
             }
             out.add(new KbgaEntity(id, fullId, label(register, m), type(register, m),
-                    detail(register, m), register));
+                    detail(register, m), register, names(register, m)));
         }
         return out;
+    }
+
+    /**
+     * Raw name strings for occurrence search: the plain {@code name} plus, for actors,
+     * {@code alternative_names} and {@code abbreviations}. Places carry only {@code name}
+     * (the API exposes no variants for them); bibls/songs contribute nothing useful.
+     */
+    @SuppressWarnings("rawtypes")
+    private List<String> names(String register, Map m) {
+        List<String> out = new ArrayList<String>();
+        if ("bibls".equals(register) || "songs".equals(register)) {
+            return out; // titles are not searched as running-text occurrences
+        }
+        addName(out, str(m.get("name")));
+        addNames(out, m.get("alternative_names"));
+        if ("actors".equals(register)) {
+            addNames(out, m.get("abbreviations"));
+        }
+        return out;
+    }
+
+    private void addName(List<String> out, String s) {
+        if (s != null) {
+            s = s.trim();
+            if (!s.isEmpty() && !out.contains(s)) {
+                out.add(s);
+            }
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private void addNames(List<String> out, Object arr) {
+        if (arr instanceof List) {
+            for (Object o : (List) arr) {
+                if (o != null) {
+                    addName(out, String.valueOf(o));
+                }
+            }
+        }
     }
 
     // --- per-register field extraction ------------------------------------

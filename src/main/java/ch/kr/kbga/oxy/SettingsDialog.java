@@ -31,6 +31,9 @@ final class SettingsDialog {
         JSpinner perPage = new JSpinner(new SpinnerNumberModel(config.getPerPage(), 5, 200, 5));
         JCheckBox insecure = new JCheckBox(
                 "Selbstsignierte / DDEV-Zertifikate akzeptieren (nur lokal)", config.isInsecureTls());
+        JCheckBox scan = new JCheckBox(
+                "Nach weiteren Vorkommen im Text fragen (Akteure/Orte, Text-Modus)",
+                config.isScanOccurrences());
         JTextField templateField = new JTextField(config.getTemplate(), 18);
         JTextArea mappingArea = new JTextArea(config.getMappingRaw(), 4, 24);
         mappingArea.setLineWrap(false);
@@ -58,6 +61,9 @@ final class SettingsDialog {
         y++;
 
         c.gridx = 1; c.gridy = y++; c.fill = GridBagConstraints.HORIZONTAL;
+        form.add(scan, c);
+
+        c.gridx = 1; c.gridy = y++; c.fill = GridBagConstraints.HORIZONTAL;
         form.add(insecure, c);
 
         c.gridx = 0; c.gridy = y; c.gridwidth = 2;
@@ -76,6 +82,7 @@ final class SettingsDialog {
             config.setBaseUrl(urlField.getText().trim());
             config.setPerPage(((Number) perPage.getValue()).intValue());
             config.setInsecureTls(insecure.isSelected());
+            config.setScanOccurrences(scan.isSelected());
             config.setTemplate(templateField.getText().trim());
             config.setMappingRaw(mappingArea.getText());
             return true;

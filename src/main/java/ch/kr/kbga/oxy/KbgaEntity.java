@@ -1,5 +1,8 @@
 package ch.kr.kbga.oxy;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * One search hit returned by the KBGA meta database (an actor, place, bibl or song).
  *
@@ -16,14 +19,23 @@ final class KbgaEntity {
     final String type;     // e.g. "Person" / "Organisation" / place_type / bibl type; may be empty
     final String detail;   // optional extra info (dates, city/country, authors); may be empty
     final String register; // "actors" | "places" | "bibls" | "songs"
+    /** Raw name strings (name + alternative_names + abbreviations) for finding further
+     *  occurrences in the document; may be empty (e.g. for recently-used picks). */
+    final List<String> names;
 
     KbgaEntity(long id, String fullId, String label, String type, String detail, String register) {
+        this(id, fullId, label, type, detail, register, Collections.<String>emptyList());
+    }
+
+    KbgaEntity(long id, String fullId, String label, String type, String detail, String register,
+               List<String> names) {
         this.id = id;
         this.fullId = fullId;
         this.label = label == null ? "" : label;
         this.type = type == null ? "" : type;
         this.detail = detail == null ? "" : detail;
         this.register = register;
+        this.names = names == null ? Collections.<String>emptyList() : names;
     }
 
     /** Rendered in the results list. */

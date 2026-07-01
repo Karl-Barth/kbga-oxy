@@ -156,6 +156,25 @@ final class RefTargets {
         return null;
     }
 
+    /** The underlying text-mode {@link Document}, or null if the page is not a Text page. */
+    static Document textDocument(WSEditor editor) {
+        if (editor == null) {
+            return null;
+        }
+        WSEditorPage page = editor.getCurrentPage();
+        if (page instanceof WSTextEditorPage) {
+            return ((WSTextEditorPage) page).getDocument();
+        }
+        return null;
+    }
+
+    /** Wrap {@code doc[start, end)} in {@code <element attr="value" extra…>…</element>}. */
+    static void wrapRange(Document doc, int start, int end, String element,
+                          String attr, String value, Map<String, String> extra) throws Exception {
+        doc.insertString(end, "</" + element + ">", null);
+        doc.insertString(start, startTag(element, attr, value, extra), null);
+    }
+
     private static String localName(String qName) {
         if (qName == null) {
             return "";

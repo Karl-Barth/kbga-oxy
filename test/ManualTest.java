@@ -30,6 +30,7 @@ public class ManualTest {
         testRegisters();
         testElementFor();
         testReferences();
+        testOccurrences();
         testConfig();
         testRecent();
         testUrls();
@@ -274,6 +275,53 @@ public class ManualTest {
         check("refs first count", "2", String.valueOf(refs.get(0).count));
         check("refs song id", "9", String.valueOf(refs.get(3).id));
         check("empty doc -> no refs", "0", String.valueOf(References.scan("").size()));
+    }
+
+    // --- Occurrences: term derivation + scanning ----------------------------
+
+    private static void testOccurrences() {
+        // term derivation: "Nachname, Vorname" -> surname + "Vorname Nachname"
+        KbgaEntity barth = new KbgaEntity(1, "kbga-actors-1", "Barth, Karl", "Person", "", "actors",
+                java.util.Arrays.asList("Barth, Karl"));
+        java.util.List<String> terms = Occurrences.terms(barth, "Karl Barth");
+        check("terms contain surname", "true", String.valueOf(terms.contains("Barth")));
+        check("terms contain full", "true", String.valueOf(terms.contains("Karl Barth")));
+        check("terms longest first", "Karl Barth", terms.get(0));
+
+        java.util.Set<String> skip = new java.util.HashSet<String>(
+                java.util.Arrays.asList("persName", "orgName", "placeName", "bibl"));
+
+        // scan: skip the already-tagged persName, match "Barths" (genitive) and "Barth."
+        String doc = "<p><persName ref=\"kbga-actors-1\">Karl Barth</persName> schrieb. "
+                + "Barths Brief an Barth. Ende.</p>";
+        java.util.List<Occurrences.Match> ms = Occurrences.find(doc, skip, terms);
+        check("occurrences found", "2", String.valueOf(ms.size()));
+        boolean allBarth = true;
+        for (Occurrences.Match m : ms) {
+            if (!doc.substring(m.start, m.end).equals("Barth")) {
+                allBarth = false;
+            }
+        }
+        check("genitive wraps base only", "true", String.valueOf(allBarth));
+
+        // without the skip set, the occurrence inside <persName> is also found (3 total)
+        java.util.List<Occurrences.Match> msNoSkip =
+                Occurrences.find(doc, new java.util.HashSet<String>(), terms);
+        check("no-skip finds tagged too", "3", String.valueOf(msNoSkip.size()));
+
+        // "Barthold" must NOT match "Barth" (letter after base, not a genitive s)
+        String doc2 = "<p>Barthold Meyer und Barths Werk.</p>";
+        java.util.List<Occurrences.Match> ms2 = Occurrences.find(doc2, skip, terms);
+        check("no false match in longer word", "1", String.valueOf(ms2.size()));
+        check("matched the genitive one", "Barth", doc2.substring(ms2.get(0).start, ms2.get(0).end));
+
+        // place genitive
+        KbgaEntity basel = new KbgaEntity(5, "kbga-places-5", "Basel", "Stadt", "", "places",
+                java.util.Arrays.asList("Basel"));
+        String doc3 = "<p>in Basel und Basels Umgebung</p>";
+        java.util.List<Occurrences.Match> ms3 =
+                Occurrences.find(doc3, skip, Occurrences.terms(basel, "Basel"));
+        check("place occurrences", "2", String.valueOf(ms3.size()));
     }
 
     // --- Config: recent picks (MRU) -----------------------------------------

@@ -134,7 +134,7 @@ public class KbgaOxyPluginExtension
                         + "oder Text markieren, um ihn auszuzeichnen und zu referenzieren.");
                 return;
             }
-            insertIntoSelection(wrap);
+            insertIntoSelection(editor, wrap);
             return;
         }
 
@@ -156,11 +156,13 @@ public class KbgaOxyPluginExtension
             }
         } catch (Exception ex) {
             error("Konnte Referenz nicht setzen: " + ex.getMessage());
+            return;
         }
+        maybeTagFurther(editor, chosen, target.currentText());
     }
 
     /** Mark up a raw text selection: pick a register, then wrap it in the right TEI element. */
-    private void insertIntoSelection(RefTargets.WrapTarget wrap) {
+    private void insertIntoSelection(WSEditor editor, RefTargets.WrapTarget wrap) {
         KbgaEntity chosen = new SearchDialog(
                 activeWindow(), client, config,
                 "actors", "", wrap.selectedText(), null, true
@@ -175,6 +177,71 @@ public class KbgaOxyPluginExtension
             wrap.wrap(element, reg.attribute, config.formatRef(chosen), reg.extraAttributes);
         } catch (Exception ex) {
             error("Konnte Auszeichnung nicht setzen: " + ex.getMessage());
+            return;
+        }
+        maybeTagFurther(editor, chosen, wrap.selectedText());
+    }
+
+    /**
+     * Offer to tag further occurrences of the just-referenced actor/place in the document
+     * (Text mode only — attribute-bearing tags are rewritten by offset on the text buffer).
+     */
+    private void maybeTagFurther(WSEditor editor, KbgaEntity chosen, String markedText) {
+        if (!config.isScanOccurrences()) {
+            return;
+        }
+        if (!"actors".equals(chosen.register) && !"places".equals(chosen.register)) {
+            return; // occurrence search only makes sense for names, not literature/songs
+        }
+        javax.swing.text.Document doc = RefTargets.textDocument(editor);
+        if (doc == null) {
+            return; // not a Text page — skip silently
+        }
+        String xml;
+        try {
+            xml = doc.getText(0, doc.getLength());
+        } catch (Exception e) {
+            return;
+        }
+        java.util.List<String> terms = Occurrences.terms(chosen, markedText);
+        if (terms.isEmpty()) {
+            return;
+        }
+        java.util.List<Occurrences.Match> matches =
+                Occurrences.find(xml, config.getMapping().keySet(), terms);
+        if (matches.isEmpty()) {
+            return;
+        }
+        String label = (chosen.label != null && !chosen.label.isEmpty()) ? chosen.label : markedText;
+        java.util.List<Occurrences.Match> picked = OccurrenceDialog.choose(
+                activeWindow(), label, Registers.elementFor(chosen), matches);
+        if (picked == null || picked.isEmpty()) {
+            return;
+        }
+        applyOccurrences(doc, picked, chosen);
+    }
+
+    /** Wrap the chosen occurrences, working from the end so earlier offsets stay valid. */
+    private void applyOccurrences(javax.swing.text.Document doc,
+                                  java.util.List<Occurrences.Match> matches, KbgaEntity chosen) {
+        Registers.Register reg = Registers.get(chosen.register);
+        String element = Registers.elementFor(chosen);
+        String value = config.formatRef(chosen);
+        java.util.List<Occurrences.Match> sorted =
+                new java.util.ArrayList<Occurrences.Match>(matches);
+        sorted.sort((a, b) -> b.start - a.start);
+        int done = 0;
+        for (Occurrences.Match m : sorted) {
+            try {
+                RefTargets.wrapRange(doc, m.start, m.end, element, reg.attribute, value,
+                        reg.extraAttributes);
+                done++;
+            } catch (Exception ex) {
+                // skip this occurrence, keep going
+            }
+        }
+        if (done > 0) {
+            info(done + (done == 1 ? " weiteres Vorkommen" : " weitere Vorkommen") + " ausgezeichnet.");
         }
     }
 

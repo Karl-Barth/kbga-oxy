@@ -33,6 +33,12 @@ Funktioniert im **Text**- und **Author**-Modus.
   ein Klick genügt für wiederkehrende Personen/Orte.
 - **Im Browser öffnen:** Button **„Im Browser…“** öffnet den gewählten Eintrag im KBGA-Portal;
   ohne Treffer die Portalsuche zum Prüfen oder Anlegen eines fehlenden Eintrags.
+- **Weitere Vorkommen mitauszeichnen:** Nach dem Referenzieren eines Akteurs/Orts sucht das
+  Plugin (im Text-Modus) das restliche Dokument nach weiteren Vorkommen ab — inklusive
+  **Genitiv-Endung** (`Barths`, `Marx'`; die Endung bleibt außerhalb des Elements) und der
+  Namensvarianten aus der Datenbank (`name`, `alternative_names`, `abbreviations`). In einer
+  Checkliste wählt man die passenden Stellen, bereits ausgezeichnete werden übersprungen.
+  Abschaltbar in den Einstellungen.
 - **Referenzen prüfen:** Menü **KBGA → KBGA-Referenzen prüfen…** löst alle `kbga-…`-IDs des
   Dokuments live gegen die Datenbank auf und meldet fehlende (404) oder nicht prüfbare Referenzen
   (im Text-Modus ausführen).

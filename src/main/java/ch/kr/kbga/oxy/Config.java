@@ -20,6 +20,7 @@ final class Config {
     static final String OPT_INSECURE = "kbga.oxy.insecureTls";
     static final String OPT_TEMPLATE = "kbga.oxy.template";
     static final String OPT_MAPPING  = "kbga.oxy.mapping";
+    static final String OPT_SCAN     = "kbga.oxy.scanOccurrences";
     /** Recent picks are stored per register under {@code kbga.oxy.recent.<register>}. */
     static final String OPT_RECENT_PREFIX = "kbga.oxy.recent.";
 
@@ -34,6 +35,8 @@ final class Config {
      * TLS in the settings for local DDEV/mkcert hosts whose cert Java does not trust.
      */
     static final String DEFAULT_INSECURE = "false";
+    /** Offer to tag further occurrences of a just-referenced actor/place (Text mode). */
+    static final String DEFAULT_SCAN = "true";
     /** Template for the written value. Placeholders: {fullId} {slug} {register} {id}. */
     static final String DEFAULT_TEMPLATE = "{fullId}";
     /**
@@ -80,6 +83,14 @@ final class Config {
 
     void setInsecureTls(boolean b) {
         store.setOption(OPT_INSECURE, b ? "true" : "false");
+    }
+
+    boolean isScanOccurrences() {
+        return "true".equalsIgnoreCase(val(OPT_SCAN, DEFAULT_SCAN));
+    }
+
+    void setScanOccurrences(boolean b) {
+        store.setOption(OPT_SCAN, b ? "true" : "false");
     }
 
     String getTemplate() {
