@@ -1,6 +1,9 @@
 package ch.kr.kbga.oxy;
 
+import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import ro.sync.exml.workspace.api.options.WSOptionsStorage;
@@ -17,6 +20,11 @@ final class Config {
     static final String OPT_INSECURE = "kbga.oxy.insecureTls";
     static final String OPT_TEMPLATE = "kbga.oxy.template";
     static final String OPT_MAPPING  = "kbga.oxy.mapping";
+    /** Recent picks are stored per register under {@code kbga.oxy.recent.<register>}. */
+    static final String OPT_RECENT_PREFIX = "kbga.oxy.recent.";
+
+    /** How many recent picks to remember per register. */
+    static final int RECENT_MAX = 10;
 
     /** Default KBGA meta database. Change to a staging/DDEV URL in the settings if needed. */
     static final String DEFAULT_URL = "https://meta.karl-barth.ch";
@@ -118,6 +126,86 @@ final class Config {
             m.put("bibl", "bibls");
         }
         return m;
+    }
+
+    // --- recent picks (MRU) per register -----------------------------------
+
+    /** Most-recently-used picks for {@code register}, newest first (may be empty). */
+    List<KbgaEntity> getRecent(String register) {
+        List<KbgaEntity> out = new ArrayList<KbgaEntity>();
+        String raw = store.getOption(OPT_RECENT_PREFIX + register, "");
+        if (raw == null || raw.isEmpty()) {
+            return out;
+        }
+        for (String line : raw.split("\\n")) {
+            if (line.isEmpty()) {
+                continue;
+            }
+            String[] f = line.split("\\t", -1);
+            if (f.length < 5 || f[0].isEmpty()) {
+                continue;
+            }
+            long id = 0L;
+            try {
+                id = Long.parseLong(f[4]);
+            } catch (NumberFormatException ignore) {
+                // keep 0
+            }
+            out.add(new KbgaEntity(id, f[0], f[1], f[2], f[3], register));
+        }
+        return out;
+    }
+
+    /** Record {@code e} as the newest pick for its register (deduped, capped at {@link #RECENT_MAX}). */
+    void addRecent(KbgaEntity e) {
+        if (e == null || e.register == null) {
+            return;
+        }
+        List<KbgaEntity> list = getRecent(e.register);
+        StringBuilder b = new StringBuilder();
+        b.append(encRecent(e));
+        int kept = 1;
+        for (KbgaEntity old : list) {
+            if (kept >= RECENT_MAX) {
+                break;
+            }
+            if (old.fullId.equals(e.fullId)) {
+                continue; // move existing entry to the front
+            }
+            b.append('\n').append(encRecent(old));
+            kept++;
+        }
+        store.setOption(OPT_RECENT_PREFIX + e.register, b.toString());
+    }
+
+    private static String encRecent(KbgaEntity e) {
+        return clean(e.fullId) + "\t" + clean(e.label) + "\t" + clean(e.type)
+                + "\t" + clean(e.detail) + "\t" + e.id;
+    }
+
+    /** Strip tab/newline so a pick round-trips through the line-based store. */
+    private static String clean(String s) {
+        return s == null ? "" : s.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
+    }
+
+    // --- browser deep-links ------------------------------------------------
+
+    /** Portal search page for a register, e.g. to check or create a missing entry. */
+    String portalSearchUrl(String register, String query) {
+        return getBaseUrl() + "/" + register + "?search=" + enc(query);
+    }
+
+    /** Portal detail page for a specific entity. */
+    String entityUrl(String register, long id) {
+        return getBaseUrl() + "/" + register + "/" + id;
+    }
+
+    private static String enc(String s) {
+        try {
+            return URLEncoder.encode(s == null ? "" : s, "UTF-8");
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     /** Build the attribute value for an entity using the configured template. */

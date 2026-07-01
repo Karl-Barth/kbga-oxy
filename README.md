@@ -15,6 +15,28 @@ setzt das richtige Attribut mit der ID aus der Datenbank (`full-id`, z. B. `kbga
 Pro Suche geht **eine** HTTP-Anfrage an `…/api/{register}?search=…` — es wird nie ein ganzes
 Register heruntergeladen. Die Such-Endpunkte sind öffentlich, es wird kein Login gesendet.
 
+## Auszeichnen und referenzieren in einem Schritt
+
+Steht der Cursor **nicht** in einem konfigurierten Element, aber es ist **Text markiert**, dann
+zeichnet das Plugin die Auswahl aus *und* referenziert sie in einem Rutsch: Register im Dialog
+wählen, Treffer bestätigen — das passende TEI-Element wird um die Auswahl gelegt und das Attribut
+gesetzt. Akteure werden als `persName`, Organisationen (erkannt am Typ) als `orgName`, Orte als
+`placeName`, Literatur/Lieder als `bibl` (bei Liedern zusätzlich `type="song"`) ausgezeichnet.
+Funktioniert im **Text**- und **Author**-Modus.
+
+## Weitere Funktionen
+
+- **Literatur + Lieder gemeinsam:** Bei `<bibl>` durchsucht das Plugin **beide** Register
+  gleichzeitig und markiert Lieder mit `[Lied]`. Wählt man ein Lied, werden `@corresp` und
+  `type="song"` automatisch gesetzt — kein manuelles Umschalten mehr nötig.
+- **Zuletzt verwendet:** Bei leerem Suchfeld zeigt der Dialog die letzten Treffer je Register —
+  ein Klick genügt für wiederkehrende Personen/Orte.
+- **Im Browser öffnen:** Button **„Im Browser…“** öffnet den gewählten Eintrag im KBGA-Portal;
+  ohne Treffer die Portalsuche zum Prüfen oder Anlegen eines fehlenden Eintrags.
+- **Referenzen prüfen:** Menü **KBGA → KBGA-Referenzen prüfen…** löst alle `kbga-…`-IDs des
+  Dokuments live gegen die Datenbank auf und meldet fehlende (404) oder nicht prüfbare Referenzen
+  (im Text-Modus ausführen).
+
 ## Register, Elemente und Attribute
 
 | Entity | Register | Vorbelegtes Element | Attribut | Beispielwert |
@@ -48,7 +70,7 @@ doppelklicken (lädt das letzte Release und installiert es ohne Build).
 Benötigt eine lokale oXygen-Installation (für `oxygen.jar`) und ein JDK.
 
 ```bash
-OXYGEN_DIR="/Applications/Oxygen XML Editor" ./build.sh   # kompiliert lib/kbga-oxy-1.0.0.jar
+OXYGEN_DIR="/Applications/Oxygen XML Editor" ./build.sh   # kompiliert lib/kbga-oxy-1.1.0.jar
 ./test/run.sh                                             # Offline-Sanity-Checks
 ./install.sh                                              # direkt in oXygen/plugins/ kopieren
 ./make-addon.sh                                           # dist/*.zip + addon/updateSite.xml

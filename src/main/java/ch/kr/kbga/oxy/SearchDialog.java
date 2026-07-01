@@ -10,6 +10,7 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -49,6 +50,7 @@ final class SearchDialog extends JDialog {
     private final JList<KbgaEntity> resultList = new JList<KbgaEntity>(model);
     private final JLabel status = new JLabel(" ");
     private final JButton okButton = new JButton("Einfügen");
+    private final JButton browseButton = new JButton("Im Browser…");
 
     private final Timer debounce;
     private SwingWorker<List<KbgaEntity>, Void> running;
@@ -57,7 +59,8 @@ final class SearchDialog extends JDialog {
     private KbgaEntity result; // null = cancelled
 
     SearchDialog(Window owner, KbgaClient client, Config config,
-                 String initialRegister, String elementName, String prefill, String currentRef) {
+                 String initialRegister, String elementName, String prefill, String currentRef,
+                 boolean creating) {
         super(owner, "KBGA-Referenz einfügen", ModalityType.APPLICATION_MODAL);
         this.client = client;
         this.config = config;
@@ -72,9 +75,16 @@ final class SearchDialog extends JDialog {
         JPanel north = new JPanel(new BorderLayout(6, 6));
         north.setBorder(BorderFactory.createEmptyBorder(10, 10, 4, 10));
 
-        StringBuilder ctx = new StringBuilder("<html>Element <b>&lt;").append(elementName).append("&gt;</b>");
-        if (currentRef != null && !currentRef.isEmpty()) {
-            ctx.append(" &nbsp;·&nbsp; aktuell: <code>").append(escape(currentRef)).append("</code>");
+        StringBuilder ctx = new StringBuilder("<html>");
+        if (creating) {
+            ctx.append("Auswahl <b>„").append(escape(prefill == null ? "" : prefill))
+               .append("“</b> auszeichnen &amp; referenzieren &nbsp;·&nbsp; "
+                       + "Register wählen — das Element wird neu erzeugt");
+        } else {
+            ctx.append("Element <b>&lt;").append(elementName).append("&gt;</b>");
+            if (currentRef != null && !currentRef.isEmpty()) {
+                ctx.append(" &nbsp;·&nbsp; aktuell: <code>").append(escape(currentRef)).append("</code>");
+            }
         }
         ctx.append("</html>");
         north.add(new JLabel(ctx.toString()), BorderLayout.NORTH);
@@ -94,8 +104,12 @@ final class SearchDialog extends JDialog {
         JButton settings = new JButton("Einstellungen…");
         JButton cancel = new JButton("Abbrechen");
 
+        browseButton.setToolTipText(
+                "Gewählten Eintrag im KBGA-Portal öffnen — oder (ohne Treffer) im Portal suchen/anlegen");
+
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
         buttons.add(settings);
+        buttons.add(browseButton);
         buttons.add(cancel);
         buttons.add(okButton);
 
@@ -145,7 +159,14 @@ final class SearchDialog extends JDialog {
             }
         });
 
-        resultList.addListSelectionListener(e -> okButton.setEnabled(resultList.getSelectedValue() != null));
+        resultList.addListSelectionListener(e -> {
+            okButton.setEnabled(resultList.getSelectedValue() != null);
+            updateBrowseButton();
+        });
+
+        browseButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) { openInBrowser(); }
+        });
 
         resultList.addMouseListener(new MouseAdapter() {
             public void mouseClicked(MouseEvent e) {
@@ -186,9 +207,7 @@ final class SearchDialog extends JDialog {
             public void run() {
                 searchField.requestFocusInWindow();
                 searchField.selectAll();
-                if (searchField.getText().trim().length() > 0) {
-                    runSearch();
-                }
+                runSearch(); // prefill → live search; empty → recently used picks
             }
         });
     }
@@ -203,8 +222,31 @@ final class SearchDialog extends JDialog {
         KbgaEntity sel = resultList.getSelectedValue();
         if (sel != null) {
             result = sel;
+            config.addRecent(sel);
             dispose();
         }
+    }
+
+    private void updateBrowseButton() {
+        boolean hasSel = resultList.getSelectedValue() != null;
+        boolean hasQuery = searchField.getText().trim().length() > 0;
+        browseButton.setEnabled(hasSel || hasQuery);
+    }
+
+    /** Open the selected entity's portal page, or (nothing selected) a portal search. */
+    private void openInBrowser() {
+        KbgaEntity sel = resultList.getSelectedValue();
+        String url = (sel != null)
+                ? config.entityUrl(sel.register, sel.id)
+                : config.portalSearchUrl(currentRegister(), searchField.getText().trim());
+        if (!Browser.open(url)) {
+            status.setText("Konnte Browser nicht öffnen: " + url);
+        }
+    }
+
+    /** True for the bibl-based registers, which are searched together (Literatur + Lieder). */
+    private static boolean isBiblFamily(String register) {
+        return "bibls".equals(register) || "songs".equals(register);
     }
 
     private String currentRegister() {
@@ -228,15 +270,22 @@ final class SearchDialog extends JDialog {
             running.cancel(true);
         }
         if (query.isEmpty()) {
-            model.clear();
-            status.setText("Suchbegriff eingeben…");
-            okButton.setEnabled(false);
+            showRecent(register);
             return;
         }
+        final boolean biblFamily = isBiblFamily(register);
         final long seq = ++querySeq;
         status.setText("Suche „" + query + "“ …");
         running = new SwingWorker<List<KbgaEntity>, Void>() {
             protected List<KbgaEntity> doInBackground() throws Exception {
+                if (biblFamily) {
+                    // Literatur and Lieder both live in <bibl>; search both so the editor
+                    // never has to know which register a title belongs to.
+                    List<KbgaEntity> merged = new ArrayList<KbgaEntity>();
+                    merged.addAll(client.search("bibls", query));
+                    merged.addAll(client.search("songs", query));
+                    return merged;
+                }
                 return client.search(register, query);
             }
             protected void done() {
@@ -250,13 +299,17 @@ final class SearchDialog extends JDialog {
                         model.addElement(e);
                     }
                     if (hits.isEmpty()) {
-                        status.setText("Keine Treffer für „" + query + "“.");
+                        status.setText("Keine Treffer für „" + query
+                                + "“ — „Im Browser…“ öffnet die Portalsuche zum Anlegen.");
                     } else {
+                        int limit = biblFamily ? config.getPerPage() * 2 : config.getPerPage();
                         status.setText(hits.size() + " Treffer"
-                                + (hits.size() >= config.getPerPage() ? " (ggf. mehr — Suche verfeinern)" : ""));
+                                + (biblFamily ? " (Literatur + Lieder)" : "")
+                                + (hits.size() >= limit ? " (ggf. mehr — Suche verfeinern)" : ""));
                         resultList.setSelectedIndex(0);
                     }
                     okButton.setEnabled(resultList.getSelectedValue() != null);
+                    updateBrowseButton();
                 } catch (Exception ex) {
                     model.clear();
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
@@ -266,6 +319,31 @@ final class SearchDialog extends JDialog {
             }
         };
         running.execute();
+    }
+
+    /** With an empty search field, offer the recently used picks for the current register. */
+    private void showRecent(String register) {
+        model.clear();
+        List<KbgaEntity> recent;
+        if (isBiblFamily(register)) {
+            recent = new ArrayList<KbgaEntity>();
+            recent.addAll(config.getRecent("bibls"));
+            recent.addAll(config.getRecent("songs"));
+        } else {
+            recent = config.getRecent(register);
+        }
+        for (KbgaEntity e : recent) {
+            model.addElement(e);
+        }
+        if (recent.isEmpty()) {
+            status.setText("Suchbegriff eingeben…");
+            okButton.setEnabled(false);
+        } else {
+            status.setText("Zuletzt verwendet (" + recent.size() + ") — oder Suchbegriff eingeben…");
+            resultList.setSelectedIndex(0);
+            okButton.setEnabled(true);
+        }
+        updateBrowseButton();
     }
 
     private static String escape(String s) {

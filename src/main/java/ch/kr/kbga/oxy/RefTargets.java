@@ -50,6 +50,21 @@ final class RefTargets {
         void setAttribute(String name, String value) throws Exception;
     }
 
+    /**
+     * A non-empty text selection that is <em>not</em> yet inside a mapped element: it can
+     * report the selected text and wrap it in a freshly created TEI element carrying the
+     * KBGA reference — turning "mark up" and "reference" into a single step.
+     */
+    interface WrapTarget {
+        /** The selected text, for pre-filling the search field. */
+        String selectedText();
+        /**
+         * Wrap the current selection in {@code <element attr="value" extra…>…</element>}.
+         * All attributes are written into the freshly created start tag at once.
+         */
+        void wrap(String element, String attr, String value, Map<String, String> extra) throws Exception;
+    }
+
     /** Convenience overload (default mapping) — used by tests. */
     static RefTarget locate(WSEditor editor) {
         return locate(editor, defaultMapping());
@@ -78,6 +93,65 @@ final class RefTargets {
         }
         if (page instanceof WSTextEditorPage) {
             return locateText((WSTextEditorPage) page, mapping);
+        }
+        return null;
+    }
+
+    /**
+     * A wrap target for the current selection, or null if nothing usable is selected.
+     * Used only as a fallback when {@link #locate} finds no mapped element under the caret.
+     */
+    static WrapTarget locateSelection(WSEditor editor) {
+        if (editor == null) {
+            return null;
+        }
+        WSEditorPage page = editor.getCurrentPage();
+        if (page instanceof WSTextEditorPage) {
+            return selectionText((WSTextEditorPage) page);
+        }
+        if (page instanceof WSAuthorEditorPage) {
+            return selectionAuthor((WSAuthorEditorPage) page);
+        }
+        return null;
+    }
+
+    /** Assemble a start tag {@code <element attr="value" extra…>} with escaped attribute values. */
+    private static String startTag(String element, String attr, String value, Map<String, String> extra) {
+        StringBuilder b = new StringBuilder("<").append(element);
+        b.append(' ').append(attr).append("=\"").append(escapeAttr(value)).append('"');
+        if (extra != null) {
+            for (Map.Entry<String, String> e : extra.entrySet()) {
+                b.append(' ').append(e.getKey()).append("=\"").append(escapeAttr(e.getValue())).append('"');
+            }
+        }
+        return b.append('>').toString();
+    }
+
+    private static String escapeAttr(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.replace("&", "&amp;").replace("\"", "&quot;")
+                .replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /**
+     * The full serialized XML of the document, for reference validation, or {@code null}
+     * if the current page is not a Text page (attribute values are only reliably reachable
+     * from the text serialization — the caller then asks the user to switch to Text mode).
+     */
+    static String documentText(WSEditor editor) {
+        if (editor == null) {
+            return null;
+        }
+        WSEditorPage page = editor.getCurrentPage();
+        if (page instanceof WSTextEditorPage) {
+            try {
+                Document doc = ((WSTextEditorPage) page).getDocument();
+                return doc.getText(0, doc.getLength());
+            } catch (Exception e) {
+                return null;
+            }
         }
         return null;
     }
@@ -146,6 +220,78 @@ final class RefTargets {
 
         public void setAttribute(String name, String value) {
             ctrl.setAttribute(name, new AttrValue(value), el);
+        }
+    }
+
+    private static WrapTarget selectionAuthor(WSAuthorEditorPage page) {
+        try {
+            if (!page.hasSelection()) {
+                return null;
+            }
+            AuthorDocumentController ctrl = page.getDocumentController();
+            int start = page.getSelectionStart();
+            int end = page.getSelectionEnd();
+            if (end <= start) {
+                return null;
+            }
+            String sel;
+            try {
+                sel = ctrl.getText(start, end - start);
+            } catch (Exception e) {
+                sel = "";
+            }
+            return new AuthorWrapTarget(ctrl, start, end, namespaceAt(ctrl, start), collapse(sel));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Namespace URI of the nearest enclosing element, or "" if none/undeclared. */
+    private static String namespaceAt(AuthorDocumentController ctrl, int offset) {
+        try {
+            AuthorNode n = ctrl.getNodeAtOffset(offset);
+            while (n != null) {
+                if (n instanceof AuthorElement) {
+                    String ns = ((AuthorElement) n).getNamespace();
+                    if (ns != null && !ns.isEmpty()) {
+                        return ns;
+                    }
+                }
+                n = n.getParent();
+            }
+        } catch (Exception e) {
+            // fall through
+        }
+        return "";
+    }
+
+    private static final class AuthorWrapTarget implements WrapTarget {
+        private final AuthorDocumentController ctrl;
+        private final int start;
+        private final int end;
+        private final String ns;
+        private final String text;
+
+        AuthorWrapTarget(AuthorDocumentController ctrl, int start, int end, String ns, String text) {
+            this.ctrl = ctrl;
+            this.start = start;
+            this.end = end;
+            this.ns = ns;
+            this.text = text;
+        }
+
+        public String selectedText() {
+            return text;
+        }
+
+        public void wrap(String element, String attr, String value, Map<String, String> extra)
+                throws Exception {
+            String open = startTag(element, attr, value, extra); // <el …>
+            if (ns != null && !ns.isEmpty()) {
+                open = open.substring(0, open.length() - 1) + " xmlns=\"" + ns + "\">";
+            }
+            String fragment = open + "</" + element + ">";
+            ctrl.surroundInFragment(fragment, start, end);
         }
     }
 
@@ -315,6 +461,55 @@ final class RefTargets {
                 }
             }
             return "<" + body + (selfClose ? "/>" : ">");
+        }
+    }
+
+    private static WrapTarget selectionText(WSTextEditorPage page) {
+        try {
+            if (!page.hasSelection()) {
+                return null;
+            }
+            int start = page.getSelectionStart();
+            int end = page.getSelectionEnd();
+            if (end <= start) {
+                return null;
+            }
+            Document doc = page.getDocument();
+            String sel = page.getSelectedText();
+            if (sel == null) {
+                sel = doc.getText(start, end - start);
+            }
+            if (sel.trim().isEmpty()) {
+                return null;
+            }
+            return new TextWrapTarget(doc, start, end, collapse(sel));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static final class TextWrapTarget implements WrapTarget {
+        private final Document doc;
+        private final int start;
+        private final int end;
+        private final String text;
+
+        TextWrapTarget(Document doc, int start, int end, String text) {
+            this.doc = doc;
+            this.start = start;
+            this.end = end;
+            this.text = text;
+        }
+
+        public String selectedText() {
+            return text;
+        }
+
+        public void wrap(String element, String attr, String value, Map<String, String> extra)
+                throws Exception {
+            // Insert the end tag first so the start offset stays valid.
+            doc.insertString(end, "</" + element + ">", null);
+            doc.insertString(start, startTag(element, attr, value, extra), null);
         }
     }
 

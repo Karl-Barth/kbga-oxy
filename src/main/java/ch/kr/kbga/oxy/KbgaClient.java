@@ -69,6 +69,66 @@ final class KbgaClient {
         }
     }
 
+    /**
+     * Resolves a single entity by numeric id via {@code GET {base}/api/{register}/{id}}.
+     *
+     * @return the entity, or {@code null} if it does not exist (HTTP 404).
+     * @throws IOException on network trouble or an unexpected non-2xx/non-404 status
+     *         (callers treat this as "not verifiable" rather than "broken").
+     */
+    KbgaEntity resolve(String register, long id) throws IOException {
+        String url = config.getBaseUrl() + "/api/" + register + "/" + id + "?format=json";
+        HttpURLConnection con = open(url);
+        try {
+            con.setRequestMethod("GET");
+            con.setRequestProperty("Accept", "application/json");
+            con.setConnectTimeout(8000);
+            con.setReadTimeout(15000);
+
+            int code = con.getResponseCode();
+            if (code == 404) {
+                return null;
+            }
+            InputStream is = (code >= 200 && code < 400) ? con.getInputStream() : con.getErrorStream();
+            String body = read(is);
+            if (code < 200 || code >= 300) {
+                throw new IOException("KBGA HTTP " + code + " für " + url);
+            }
+            return parseOne(register, body);
+        } finally {
+            con.disconnect();
+        }
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private KbgaEntity parseOne(String register, String body) {
+        Object root = Json.parse(body);
+        Object obj = root;
+        if (root instanceof Map) {
+            Object data = ((Map) root).get("data");
+            if (data instanceof Map) {
+                obj = data;         // {"data":{...}}
+            } else if (data instanceof List && !((List) data).isEmpty()) {
+                obj = ((List) data).get(0); // {"data":[{...}]}
+            }
+        }
+        if (!(obj instanceof Map)) {
+            return null;
+        }
+        Map m = (Map) obj;
+        String fullId = str(m.get("full-id"));
+        if (fullId == null || fullId.isEmpty()) {
+            return null;
+        }
+        long id = 0L;
+        Object idO = m.get("id");
+        if (idO instanceof Number) {
+            id = ((Number) idO).longValue();
+        }
+        return new KbgaEntity(id, fullId, label(register, m), type(register, m),
+                detail(register, m), register);
+    }
+
     @SuppressWarnings({ "unchecked", "rawtypes" })
     private List<KbgaEntity> parse(String register, String body) {
         List<KbgaEntity> out = new ArrayList<KbgaEntity>();
@@ -129,7 +189,7 @@ final class KbgaClient {
         if ("bibls".equals(register)) {
             return firstNonEmpty(m, "type");
         }
-        return ""; // songs
+        return "Lied"; // songs — label the source so it stands out in a merged bibl list
     }
 
     @SuppressWarnings("rawtypes")

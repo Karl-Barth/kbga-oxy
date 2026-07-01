@@ -34,13 +34,17 @@ final class Registers {
         final String attribute;
         /** Extra attributes to set on the element (insertion order), e.g. {@code type=song}. */
         final Map<String, String> extraAttributes;
+        /** Element created when marking up a raw text selection, e.g. "persName" or "bibl". */
+        final String defaultElement;
 
-        Register(String key, String label, String attribute, Map<String, String> extraAttributes) {
+        Register(String key, String label, String attribute, Map<String, String> extraAttributes,
+                 String defaultElement) {
             this.key = key;
             this.label = label;
             this.attribute = attribute;
             this.extraAttributes = extraAttributes == null
                     ? Collections.<String, String>emptyMap() : extraAttributes;
+            this.defaultElement = defaultElement;
         }
 
         public String toString() {
@@ -51,10 +55,10 @@ final class Registers {
     private static final Map<String, Register> BY_KEY = new LinkedHashMap<String, Register>();
 
     static {
-        add(new Register("actors", "Akteure (persName / orgName)", "ref", null));
-        add(new Register("places", "Orte (placeName)", "ref", null));
-        add(new Register("bibls", "Literatur (bibl)", "corresp", null));
-        add(new Register("songs", "Lieder (bibl @type=song)", "corresp", songType()));
+        add(new Register("actors", "Akteure (persName / orgName)", "ref", null, "persName"));
+        add(new Register("places", "Orte (placeName)", "ref", null, "placeName"));
+        add(new Register("bibls", "Literatur (bibl)", "corresp", null, "bibl"));
+        add(new Register("songs", "Lieder (bibl @type=song)", "corresp", songType(), "bibl"));
     }
 
     private Registers() { }
@@ -83,5 +87,29 @@ final class Registers {
     /** Whether {@code key} is one of the known registers. */
     static boolean isKnown(String key) {
         return BY_KEY.containsKey(key);
+    }
+
+    /**
+     * The TEI element a raw text selection should be wrapped in for {@code entity}.
+     * Actors that are organisations get {@code orgName} instead of {@code persName};
+     * everything else uses the register's {@link Register#defaultElement}.
+     */
+    static String elementFor(KbgaEntity entity) {
+        Register r = get(entity.register);
+        if ("actors".equals(r.key) && isOrganisation(entity.type)) {
+            return "orgName";
+        }
+        return r.defaultElement;
+    }
+
+    /** Heuristic: does this actor type denote an organisation rather than a person? */
+    static boolean isOrganisation(String type) {
+        if (type == null) {
+            return false;
+        }
+        String t = type.toLowerCase();
+        return t.contains("organi")      // Organisation / organization
+                || t.contains("körpersch") || t.contains("koerpersch") || t.contains("korpersch")
+                || t.contains("corporate") || t.contains("institut") || t.contains("verein");
     }
 }

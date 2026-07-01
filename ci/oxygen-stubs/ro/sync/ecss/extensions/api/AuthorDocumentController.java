@@ -6,4 +6,5 @@ public interface AuthorDocumentController {
     AuthorNode getNodeAtOffset(int offset) throws javax.swing.text.BadLocationException;
     void setAttribute(String attributeName, AttrValue value, AuthorElement element);
     String getText(int offset, int length) throws javax.swing.text.BadLocationException;
+    void surroundInFragment(String xmlFragment, int startOffset, int endOffset) throws Exception;
 }

@@ -4,7 +4,7 @@
     id="ch.kr.kbga.oxy"
     name="kbga-oxy"
     description="Sucht Akteure, Orte, Literatur und Lieder live in der KBGA-Metadatenbank (meta.karl-barth.ch) und schreibt die id (z. B. kbga-actors-123) in das passende Attribut des Elements unter dem Cursor: @ref für Akteure/Orte, @corresp für Literatur/Lieder (Lieder zusätzlich mit type=&quot;song&quot;)."
-    version="1.0.0"
+    version="1.1.0"
     vendor="K-R / KBGA"
     class="ch.kr.kbga.oxy.KbgaOxyPlugin"
     classLoaderType="preferReferencedResources">

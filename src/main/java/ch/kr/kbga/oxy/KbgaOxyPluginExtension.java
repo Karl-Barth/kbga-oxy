@@ -84,6 +84,13 @@ public class KbgaOxyPluginExtension
             }
         });
 
+        JMenuItem check = new JMenuItem("KBGA-Referenzen prüfen …");
+        check.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                validateReferences();
+            }
+        });
+
         JMenuItem settings = new JMenuItem("KBGA-Einstellungen …");
         settings.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -92,6 +99,7 @@ public class KbgaOxyPluginExtension
         });
 
         menu.add(insert);
+        menu.add(check);
         menu.addSeparator();
         menu.add(settings);
 
@@ -118,9 +126,15 @@ public class KbgaOxyPluginExtension
         final Map<String, String> mapping = config.getMapping();
         final RefTargets.RefTarget target = RefTargets.locate(editor, mapping);
         if (target == null) {
-            info("Cursor in ein konfiguriertes Element setzen ("
-                    + String.join(", ", mapping.keySet()) + "),\n"
-                    + "dann die Aktion erneut auslösen.");
+            // No mapped element under the caret — fall back to marking up a raw selection.
+            RefTargets.WrapTarget wrap = RefTargets.locateSelection(editor);
+            if (wrap == null) {
+                info("Cursor in ein konfiguriertes Element setzen ("
+                        + String.join(", ", mapping.keySet()) + "),\n"
+                        + "oder Text markieren, um ihn auszuzeichnen und zu referenzieren.");
+                return;
+            }
+            insertIntoSelection(wrap);
             return;
         }
 
@@ -128,7 +142,7 @@ public class KbgaOxyPluginExtension
         KbgaEntity chosen = new SearchDialog(
                 activeWindow(), client, config,
                 target.register(), target.elementName(),
-                target.currentText(), target.currentRef(defaultAttr)
+                target.currentText(), target.currentRef(defaultAttr), false
         ).showDialog();
 
         if (chosen == null) {
@@ -143,6 +157,41 @@ public class KbgaOxyPluginExtension
         } catch (Exception ex) {
             error("Konnte Referenz nicht setzen: " + ex.getMessage());
         }
+    }
+
+    /** Mark up a raw text selection: pick a register, then wrap it in the right TEI element. */
+    private void insertIntoSelection(RefTargets.WrapTarget wrap) {
+        KbgaEntity chosen = new SearchDialog(
+                activeWindow(), client, config,
+                "actors", "", wrap.selectedText(), null, true
+        ).showDialog();
+
+        if (chosen == null) {
+            return; // cancelled
+        }
+        try {
+            Registers.Register reg = Registers.get(chosen.register);
+            String element = Registers.elementFor(chosen);
+            wrap.wrap(element, reg.attribute, config.formatRef(chosen), reg.extraAttributes);
+        } catch (Exception ex) {
+            error("Konnte Auszeichnung nicht setzen: " + ex.getMessage());
+        }
+    }
+
+    /** Check every KBGA reference in the current document against the meta database. */
+    private void validateReferences() {
+        WSEditor editor = workspace.getCurrentEditorAccess(PluginWorkspace.MAIN_EDITING_AREA);
+        if (editor == null) {
+            info("Kein XML-Dokument geöffnet.");
+            return;
+        }
+        String xml = RefTargets.documentText(editor);
+        if (xml == null) {
+            info("Für die Referenzprüfung bitte in den Text-Modus wechseln\n"
+                    + "(Reiter „Text“ unten am Editor) und die Aktion erneut auslösen.");
+            return;
+        }
+        ReferenceCheckDialog.run(activeWindow(), client, config, xml);
     }
 
     // --- ui helpers --------------------------------------------------------

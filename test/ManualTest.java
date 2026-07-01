@@ -26,8 +26,13 @@ public class ManualTest {
     public static void main(String[] args) throws Exception {
         testJson();
         testTextMode();
+        testSelectionWrap();
         testRegisters();
+        testElementFor();
+        testReferences();
         testConfig();
+        testRecent();
+        testUrls();
         System.out.println(failures == 0 ? "\nALL TESTS PASSED" : "\n" + failures + " TEST(S) FAILED");
         if (failures > 0) {
             System.exit(1);
@@ -188,7 +193,7 @@ public class ManualTest {
         }
     }
 
-    /** Proxy-backed WSOptionsStorage returning the given overrides, else the supplied default. */
+    /** Proxy-backed WSOptionsStorage: reads from and writes to the given (mutable) map. */
     private static WSOptionsStorage store(final Map<String, String> opts) {
         return (WSOptionsStorage) Proxy.newProxyInstance(
                 ManualTest.class.getClassLoader(),
@@ -199,9 +204,103 @@ public class ManualTest {
                             String k = (String) a[0];
                             return opts.containsKey(k) ? opts.get(k) : a[1];
                         }
+                        if (method.getName().equals("setOption")) {
+                            opts.put((String) a[0], (String) a[1]);
+                            return null;
+                        }
                         return null;
                     }
                 });
+    }
+
+    // --- selection wrap (mark up a raw selection) ---------------------------
+
+    private static void testSelectionWrap() throws Exception {
+        // 1) plain selection -> wrapped in persName with @ref
+        String xml = "<p>Brief von Karl Barth an Eduard</p>";
+        int start = xml.indexOf("Karl Barth");
+        int end = start + "Karl Barth".length();
+        WSEditor ed = editor(xml, start, end);
+        RefTargets.WrapTarget w = RefTargets.locateSelection(ed);
+        check("wrap located", "true", String.valueOf(w != null));
+        check("wrap selected text", "Karl Barth", w.selectedText());
+        w.wrap("persName", "ref", "kbga-actors-1", java.util.Collections.<String, String>emptyMap());
+        String after = lastDoc.getText(0, lastDoc.getLength());
+        check("wrap persName", "true", String.valueOf(
+                after.contains("<persName ref=\"kbga-actors-1\">Karl Barth</persName>")));
+
+        // 2) selection wrapped as a song -> corresp + type="song"
+        String xml2 = "<p>Lied Ach stirbt denn hier</p>";
+        int s2 = xml2.indexOf("Ach stirbt denn");
+        int e2 = s2 + "Ach stirbt denn".length();
+        WSEditor ed2 = editor(xml2, s2, e2);
+        RefTargets.WrapTarget w2 = RefTargets.locateSelection(ed2);
+        w2.wrap("bibl", "corresp", "kbga-songs-9", Registers.get("songs").extraAttributes);
+        String after2 = lastDoc.getText(0, lastDoc.getLength());
+        check("wrap song", "true", String.valueOf(
+                after2.contains("<bibl corresp=\"kbga-songs-9\" type=\"song\">Ach stirbt denn</bibl>")));
+
+        // 3) no selection -> no wrap target
+        WSEditor ed3 = editor("<p>ohne Auswahl</p>", 3, -1);
+        check("no selection -> null wrap", "null", String.valueOf(RefTargets.locateSelection(ed3)));
+    }
+
+    // --- Registers.elementFor ----------------------------------------------
+
+    private static void testElementFor() {
+        check("elementFor person", "persName",
+                Registers.elementFor(new KbgaEntity(1, "kbga-actors-1", "x", "Person", "", "actors")));
+        check("elementFor organisation", "orgName",
+                Registers.elementFor(new KbgaEntity(2, "kbga-actors-2", "x", "Körperschaft", "", "actors")));
+        check("elementFor place", "placeName",
+                Registers.elementFor(new KbgaEntity(3, "kbga-places-3", "x", "", "", "places")));
+        check("elementFor song", "bibl",
+                Registers.elementFor(new KbgaEntity(4, "kbga-songs-4", "x", "", "", "songs")));
+        check("isOrganisation Verein", "true", String.valueOf(Registers.isOrganisation("Verein")));
+        check("isOrganisation Person", "false", String.valueOf(Registers.isOrganisation("Person")));
+    }
+
+    // --- References.scan ----------------------------------------------------
+
+    private static void testReferences() {
+        String doc = "<p><persName ref=\"kbga-actors-10\">A</persName> und "
+                + "<persName ref=\"kbga-actors-10\">A</persName>, "
+                + "<placeName ref=\"kbga-places-5\">B</placeName>, "
+                + "<bibl corresp=\"kbga-bibls-1\"/> <bibl corresp=\"kbga-songs-9\" type=\"song\"/></p>";
+        java.util.List<References.Ref> refs = References.scan(doc);
+        check("refs distinct count", "4", String.valueOf(refs.size()));
+        check("refs total occurrences", "5", String.valueOf(References.totalOccurrences(refs)));
+        check("refs first register", "actors", refs.get(0).register);
+        check("refs first count", "2", String.valueOf(refs.get(0).count));
+        check("refs song id", "9", String.valueOf(refs.get(3).id));
+        check("empty doc -> no refs", "0", String.valueOf(References.scan("").size()));
+    }
+
+    // --- Config: recent picks (MRU) -----------------------------------------
+
+    private static void testRecent() {
+        Config c = new Config(store(new HashMap<String, String>()));
+        check("recent empty initially", "0", String.valueOf(c.getRecent("places").size()));
+        c.addRecent(new KbgaEntity(5, "kbga-places-5", "Basel", "Stadt", "CH", "places"));
+        c.addRecent(new KbgaEntity(6, "kbga-places-6", "Bern", "Stadt", "CH", "places"));
+        java.util.List<KbgaEntity> rec = c.getRecent("places");
+        check("recent size", "2", String.valueOf(rec.size()));
+        check("recent newest first", "kbga-places-6", rec.get(0).fullId);
+        check("recent label round-trip", "Basel", rec.get(1).label);
+        // re-adding an existing pick moves it to the front without duplicating
+        c.addRecent(new KbgaEntity(5, "kbga-places-5", "Basel", "Stadt", "CH", "places"));
+        java.util.List<KbgaEntity> rec2 = c.getRecent("places");
+        check("recent dedup size", "2", String.valueOf(rec2.size()));
+        check("recent moved to front", "kbga-places-5", rec2.get(0).fullId);
+    }
+
+    // --- Config: browser deep-links -----------------------------------------
+
+    private static void testUrls() {
+        Config c = new Config(store(new HashMap<String, String>()));
+        check("portal search url", "https://meta.karl-barth.ch/actors?search=Barth",
+                c.portalSearchUrl("actors", "Barth"));
+        check("entity url", "https://meta.karl-barth.ch/places/5", c.entityUrl("places", 5));
     }
 
     // --- proxy plumbing -----------------------------------------------------
