@@ -76,7 +76,7 @@ doppelklicken (lädt das letzte Release und installiert es ohne Build).
 Benötigt eine lokale oXygen-Installation (für `oxygen.jar`) und ein JDK.
 
 ```bash
-OXYGEN_DIR="/Applications/Oxygen XML Editor" ./build.sh   # kompiliert lib/kbga-oxy-1.1.0.jar
+OXYGEN_DIR="/Applications/Oxygen XML Editor" ./build.sh   # kompiliert lib/kbga-oxy-1.1.1.jar
 ./test/run.sh                                             # Offline-Sanity-Checks
 ./install.sh                                              # direkt in oXygen/plugins/ kopieren
 ./make-addon.sh                                           # dist/*.zip + addon/updateSite.xml
