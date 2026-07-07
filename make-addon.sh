@@ -12,7 +12,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 
-VERSION="1.1.2"
+VERSION="1.1.3"
 OXY_MIN="22.0+"
 ID="ch.kr.kbga.oxy"
 NAME="kbga-oxy"
