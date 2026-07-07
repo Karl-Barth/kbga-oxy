@@ -10,7 +10,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 
 OXYGEN_DIR="${OXYGEN_DIR:-/Applications/Oxygen XML Editor}"
-VERSION="1.1.1"
+VERSION="1.1.2"
 JAR="lib/kbga-oxy-${VERSION}.jar"
 TARGET="$OXYGEN_DIR/plugins/kbga-oxy"
 
