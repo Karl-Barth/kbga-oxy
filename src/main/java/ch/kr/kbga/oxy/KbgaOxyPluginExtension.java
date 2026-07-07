@@ -221,7 +221,11 @@ public class KbgaOxyPluginExtension
         applyOccurrences(doc, picked, chosen);
     }
 
-    /** Wrap the chosen occurrences, working from the end so earlier offsets stay valid. */
+    /**
+     * Wrap the chosen occurrences in one edit over the covering span, so the whole batch is a
+     * single undo step. Falls back to wrapping them one by one (from the end, so earlier
+     * offsets stay valid) if the combined edit fails.
+     */
     private void applyOccurrences(javax.swing.text.Document doc,
                                   java.util.List<Occurrences.Match> matches, KbgaEntity chosen) {
         Registers.Register reg = Registers.get(chosen.register);
@@ -229,15 +233,27 @@ public class KbgaOxyPluginExtension
         String value = config.formatRef(chosen);
         java.util.List<Occurrences.Match> sorted =
                 new java.util.ArrayList<Occurrences.Match>(matches);
-        sorted.sort((a, b) -> b.start - a.start);
+        sorted.sort((a, b) -> a.start - b.start); // ascending for the covering-span rebuild
+
         int done = 0;
-        for (Occurrences.Match m : sorted) {
-            try {
-                RefTargets.wrapRange(doc, m.start, m.end, element, reg.attribute, value,
-                        reg.extraAttributes);
-                done++;
-            } catch (Exception ex) {
-                // skip this occurrence, keep going
+        try {
+            int[][] ranges = new int[sorted.size()][];
+            for (int i = 0; i < sorted.size(); i++) {
+                ranges[i] = new int[] { sorted.get(i).start, sorted.get(i).end };
+            }
+            RefTargets.wrapRanges(doc, ranges, element, reg.attribute, value, reg.extraAttributes);
+            done = sorted.size();
+        } catch (Exception combined) {
+            // fall back to per-occurrence wrapping, working from the end so offsets stay valid
+            for (int i = sorted.size() - 1; i >= 0; i--) {
+                Occurrences.Match m = sorted.get(i);
+                try {
+                    RefTargets.wrapRange(doc, m.start, m.end, element, reg.attribute, value,
+                            reg.extraAttributes);
+                    done++;
+                } catch (Exception ex) {
+                    // skip this occurrence, keep going
+                }
             }
         }
         if (done > 0) {

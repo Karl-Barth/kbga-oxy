@@ -31,6 +31,7 @@ public class ManualTest {
         testElementFor();
         testReferences();
         testOccurrences();
+        testWrapRanges();
         testConfig();
         testRecent();
         testUrls();
@@ -342,6 +343,37 @@ public class ManualTest {
         check("row drops guillemets", "true", String.valueOf(!row.contains("«") && !row.contains("»")));
         check("row escapes markup", "true",
                 String.valueOf(OccurrenceDialog.htmlRow("a < b «X» &").contains("&lt; b <b>X</b> &amp;")));
+    }
+
+    // --- RefTargets: batch wrapping (single covering-span edit) --------------
+
+    private static void testWrapRanges() throws Exception {
+        java.util.Map<String, String> noExtra = new java.util.LinkedHashMap<String, String>();
+
+        // two occurrences wrapped in one covering-span edit, offsets stay correct
+        PlainDocument doc = new PlainDocument();
+        doc.insertString(0, "Karl Barth und Barth.", null);
+        RefTargets.wrapRanges(doc, new int[][] { {0, 10}, {15, 20} },
+                "persName", "ref", "kbga-actors-1", noExtra);
+        String out = doc.getText(0, doc.getLength());
+        String expect = "<persName ref=\"kbga-actors-1\">Karl Barth</persName> und "
+                + "<persName ref=\"kbga-actors-1\">Barth</persName>.";
+        check("wrapRanges batch text", expect, out);
+
+        // batch result matches wrapping each range on its own (from the end)
+        PlainDocument seq = new PlainDocument();
+        seq.insertString(0, "Karl Barth und Barth.", null);
+        RefTargets.wrapRange(seq, 15, 20, "persName", "ref", "kbga-actors-1", noExtra);
+        RefTargets.wrapRange(seq, 0, 10, "persName", "ref", "kbga-actors-1", noExtra);
+        check("batch equals sequential", seq.getText(0, seq.getLength()), out);
+
+        // single range still wraps correctly (delegates to wrapRange)
+        PlainDocument one = new PlainDocument();
+        one.insertString(0, "in Basel heute", null);
+        RefTargets.wrapRanges(one, new int[][] { {3, 8} },
+                "placeName", "ref", "kbga-places-5", noExtra);
+        check("wrapRanges single", "in <placeName ref=\"kbga-places-5\">Basel</placeName> heute",
+                one.getText(0, one.getLength()));
     }
 
     // --- Config: recent picks (MRU) -----------------------------------------
