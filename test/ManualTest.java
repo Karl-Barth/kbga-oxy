@@ -10,7 +10,9 @@ import java.util.Map;
 import javax.swing.text.Document;
 import javax.swing.text.PlainDocument;
 
+import ro.sync.ecss.extensions.api.AuthorDocumentController;
 import ro.sync.exml.workspace.api.editor.WSEditor;
+import ro.sync.exml.workspace.api.editor.page.author.WSAuthorEditorPage;
 import ro.sync.exml.workspace.api.editor.page.text.WSTextEditorPage;
 import ro.sync.exml.workspace.api.options.WSOptionsStorage;
 
@@ -27,6 +29,7 @@ public class ManualTest {
         testJson();
         testTextMode();
         testSelectionWrap();
+        testAuthorWrap();
         testRegisters();
         testElementFor();
         testReferences();
@@ -343,6 +346,71 @@ public class ManualTest {
         check("row drops guillemets", "true", String.valueOf(!row.contains("«") && !row.contains("»")));
         check("row escapes markup", "true",
                 String.valueOf(OccurrenceDialog.htmlRow("a < b «X» &").contains("&lt; b <b>X</b> &amp;")));
+    }
+
+    // --- RefTargets: Author-mode surround (selection-offset semantics) ------
+
+    private static String recFragment;
+    private static int recStart;
+    private static int recEnd;
+
+    private static void testAuthorWrap() throws Exception {
+        java.util.Map<String, String> noExtra = new java.util.LinkedHashMap<String, String>();
+        recFragment = null; recStart = -1; recEnd = -1;
+
+        // selection [12, 17): getSelectionEnd() is exclusive, but surroundInFragment expects
+        // an inclusive end, so the controller must receive 16 (= 17 - 1), not 17.
+        WSEditor ed = authorEditor(12, 17);
+        RefTargets.WrapTarget w = RefTargets.locateSelection(ed);
+        check("author wrap target found", "true", String.valueOf(w != null));
+        w.wrap("persName", "ref", "kbga-actors-1", noExtra);
+        check("author surround start", "12", String.valueOf(recStart));
+        check("author surround end is inclusive", "16", String.valueOf(recEnd));
+        check("author fragment carries ref", "true",
+                String.valueOf(recFragment != null && recFragment.contains("ref=\"kbga-actors-1\"")));
+    }
+
+    /** Author editor proxy whose controller records the surroundInFragment offsets. */
+    private static WSEditor authorEditor(final int selStart, final int selEnd) {
+        final AuthorDocumentController ctrl = (AuthorDocumentController) Proxy.newProxyInstance(
+                ManualTest.class.getClassLoader(),
+                new Class[] { AuthorDocumentController.class },
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method method, Object[] a) {
+                        String n = method.getName();
+                        if (n.equals("surroundInFragment")) {
+                            recFragment = (String) a[0];
+                            recStart = (Integer) a[1];
+                            recEnd = (Integer) a[2];
+                            return null;
+                        }
+                        if (n.equals("getText")) return "Barth";
+                        if (n.equals("getNodeAtOffset")) return null; // -> namespace ""
+                        return defaultFor(method.getReturnType());
+                    }
+                });
+        final WSAuthorEditorPage page = (WSAuthorEditorPage) Proxy.newProxyInstance(
+                ManualTest.class.getClassLoader(),
+                new Class[] { WSAuthorEditorPage.class },
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method method, Object[] a) {
+                        String n = method.getName();
+                        if (n.equals("getDocumentController")) return ctrl;
+                        if (n.equals("getSelectionStart")) return selStart;
+                        if (n.equals("getSelectionEnd")) return selEnd;
+                        if (n.equals("hasSelection")) return true;
+                        return defaultFor(method.getReturnType());
+                    }
+                });
+        return (WSEditor) Proxy.newProxyInstance(
+                ManualTest.class.getClassLoader(),
+                new Class[] { WSEditor.class },
+                new InvocationHandler() {
+                    public Object invoke(Object proxy, Method method, Object[] a) {
+                        if (method.getName().equals("getCurrentPage")) return page;
+                        return defaultFor(method.getReturnType());
+                    }
+                });
     }
 
     // --- RefTargets: batch wrapping (single covering-span edit) --------------

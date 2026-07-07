@@ -355,7 +355,11 @@ final class RefTargets {
                 open = open.substring(0, open.length() - 1) + " xmlns=\"" + ns + "\">";
             }
             String fragment = open + "</" + element + ">";
-            ctrl.surroundInFragment(fragment, start, end);
+            // getSelectionEnd() is exclusive (offset *after* the last selected char), but
+            // surroundInFragment expects an inclusive end offset — hence end - 1, the same
+            // idiom oXygen's own SurroundWithFragmentOperation uses. Without it the wrap
+            // reaches one position too far right and the markup drifts off the selection.
+            ctrl.surroundInFragment(fragment, start, end - 1);
         }
     }
 
