@@ -6,6 +6,8 @@ import java.awt.FlowLayout;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +32,7 @@ final class OccurrenceDialog extends JDialog {
 
     private final List<Occurrences.Match> matches;
     private final List<JCheckBox> boxes = new ArrayList<JCheckBox>();
+    private final JLabel countLabel = new JLabel();
     private boolean confirmed;
 
     private OccurrenceDialog(Window owner, String entityLabel, String element,
@@ -43,11 +46,15 @@ final class OccurrenceDialog extends JDialog {
                 + "(Genitiv-Endung bleibt außerhalb).</html>");
         header.setBorder(BorderFactory.createEmptyBorder(10, 12, 6, 12));
 
+        ItemListener recount = new ItemListener() {
+            public void itemStateChanged(ItemEvent e) { updateCount(); }
+        };
         JPanel listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
         listPanel.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
         for (Occurrences.Match m : matches) {
-            JCheckBox cb = new JCheckBox(m.snippet, true);
+            JCheckBox cb = new JCheckBox(htmlRow(m.snippet), true);
+            cb.addItemListener(recount);
             boxes.add(cb);
             listPanel.add(cb);
         }
@@ -66,8 +73,10 @@ final class OccurrenceDialog extends JDialog {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
         right.add(cancel);
         right.add(ok);
+        countLabel.setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
         JPanel buttons = new JPanel(new BorderLayout());
         buttons.add(left, BorderLayout.WEST);
+        buttons.add(countLabel, BorderLayout.CENTER);
         buttons.add(right, BorderLayout.EAST);
 
         setLayout(new BorderLayout());
@@ -85,9 +94,37 @@ final class OccurrenceDialog extends JDialog {
         });
 
         getRootPane().setDefaultButton(ok);
+        updateCount();
         setMinimumSize(new Dimension(680, 420));
         pack();
         setLocationRelativeTo(owner);
+    }
+
+    private void updateCount() {
+        int sel = 0;
+        for (JCheckBox cb : boxes) {
+            if (cb.isSelected()) {
+                sel++;
+            }
+        }
+        countLabel.setText(sel + " / " + boxes.size() + " ausgewählt");
+    }
+
+    /** Render one preview row with the base name (inside «…») set in bold, context normal. */
+    static String htmlRow(String snippet) {
+        if (snippet == null) {
+            return "";
+        }
+        int l = snippet.indexOf('«');
+        int r = snippet.indexOf('»');
+        if (l < 0 || r < 0 || r < l) {
+            return "<html>" + escape(snippet) + "</html>";
+        }
+        String before = snippet.substring(0, l);
+        String base = snippet.substring(l + 1, r);
+        String after = snippet.substring(r + 1);
+        return "<html>" + escape(before) + "<b>" + escape(base) + "</b>"
+                + escape(after) + "</html>";
     }
 
     private ActionListener setAll(final boolean value) {
@@ -113,6 +150,10 @@ final class OccurrenceDialog extends JDialog {
      */
     static List<Occurrences.Match> choose(Window owner, String entityLabel, String element,
                                           List<Occurrences.Match> matches) {
+        // show occurrences in document order so the list reads top-to-bottom like the text.
+        List<Occurrences.Match> ordered = new ArrayList<Occurrences.Match>(matches);
+        ordered.sort((a, b) -> a.start - b.start);
+        matches = ordered;
         OccurrenceDialog d = new OccurrenceDialog(owner, entityLabel, element, matches);
         d.setVisible(true);
         if (!d.confirmed) {

@@ -334,6 +334,14 @@ public class ManualTest {
         check("base name wrapped", "true", String.valueOf(wide.contains("«Karl Barth»")));
         check("no cut word at edge", "true",
                 String.valueOf(wide.contains("Weiterhin") && wide.contains("Zeit")));
+
+        // dialog row rendering: base name inside «…» becomes bold, guillemets dropped, HTML-safe
+        String row = OccurrenceDialog.htmlRow("… mit «Karl Barth» ueber …");
+        check("row is html", "true", String.valueOf(row.startsWith("<html>") && row.endsWith("</html>")));
+        check("row bolds base", "true", String.valueOf(row.contains("<b>Karl Barth</b>")));
+        check("row drops guillemets", "true", String.valueOf(!row.contains("«") && !row.contains("»")));
+        check("row escapes markup", "true",
+                String.valueOf(OccurrenceDialog.htmlRow("a < b «X» &").contains("&lt; b <b>X</b> &amp;")));
     }
 
     // --- Config: recent picks (MRU) -----------------------------------------
