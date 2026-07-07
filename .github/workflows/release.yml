@@ -82,6 +82,15 @@ jobs:
             printf '%s\n' '</xt:extensions>'
           } > dist/updateSite.xml
 
+      - name: Run offline tests
+        run: |
+          set -euo pipefail
+          # Reuse the stubs + classes compiled in the build step; a failing test
+          # fails the job before the release is published.
+          mkdir -p build/test
+          javac -encoding UTF-8 -cp "build/stubs:build/classes" -d build/test test/ManualTest.java
+          java -cp "build/stubs:build/classes:build/test" ch.kr.kbga.oxy.ManualTest
+
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
