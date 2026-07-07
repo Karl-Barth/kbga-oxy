@@ -208,7 +208,7 @@ public class KbgaOxyPluginExtension
             return;
         }
         java.util.List<Occurrences.Match> matches =
-                Occurrences.find(xml, config.getMapping().keySet(), terms);
+                Occurrences.find(xml, config.getMapping().keySet(), terms, config.getContextChars());
         if (matches.isEmpty()) {
             return;
         }

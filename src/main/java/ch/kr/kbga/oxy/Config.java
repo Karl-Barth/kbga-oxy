@@ -21,6 +21,7 @@ final class Config {
     static final String OPT_TEMPLATE = "kbga.oxy.template";
     static final String OPT_MAPPING  = "kbga.oxy.mapping";
     static final String OPT_SCAN     = "kbga.oxy.scanOccurrences";
+    static final String OPT_CONTEXT  = "kbga.oxy.contextChars";
     /** Recent picks are stored per register under {@code kbga.oxy.recent.<register>}. */
     static final String OPT_RECENT_PREFIX = "kbga.oxy.recent.";
 
@@ -37,6 +38,10 @@ final class Config {
     static final String DEFAULT_INSECURE = "false";
     /** Offer to tag further occurrences of a just-referenced actor/place (Text mode). */
     static final String DEFAULT_SCAN = "true";
+    /** Context characters shown left and right of the base name in the occurrence preview. */
+    static final String DEFAULT_CONTEXT = "60";
+    static final int CONTEXT_MIN = 20;
+    static final int CONTEXT_MAX = 300;
     /** Template for the written value. Placeholders: {fullId} {slug} {register} {id}. */
     static final String DEFAULT_TEMPLATE = "{fullId}";
     /**
@@ -91,6 +96,21 @@ final class Config {
 
     void setScanOccurrences(boolean b) {
         store.setOption(OPT_SCAN, b ? "true" : "false");
+    }
+
+    /** Context width (chars per side) for the occurrence preview, clamped to a sane range. */
+    int getContextChars() {
+        int n;
+        try {
+            n = Integer.parseInt(val(OPT_CONTEXT, DEFAULT_CONTEXT));
+        } catch (NumberFormatException e) {
+            n = Integer.parseInt(DEFAULT_CONTEXT);
+        }
+        return Math.max(CONTEXT_MIN, Math.min(CONTEXT_MAX, n));
+    }
+
+    void setContextChars(int n) {
+        store.setOption(OPT_CONTEXT, String.valueOf(Math.max(CONTEXT_MIN, Math.min(CONTEXT_MAX, n))));
     }
 
     String getTemplate() {

@@ -93,6 +93,7 @@ Kompiliert wird auf **Java-8-Bytecode**, läuft daher auf oXygen 22 und neuer.
 - **Treffer pro Suche** (Standard: `30`)
 - **ID-Template** (Standard: `{fullId}`) — Platzhalter `{fullId}` `{slug}` `{register}` `{id}`
 - **Element → Register** — Zuordnung fürs Vorbelegen des Registers (eine `element=register`-Zeile je Element; Register: `actors`, `places`, `bibls`, `songs`)
+- **Vorschau-Kontext (Zeichen/Seite)** (Standard: `60`) — wie viel Text bei „Weitere Vorkommen mitauszeichnen" links und rechts der Fundstelle angezeigt wird; Wörter am Rand werden nicht abgeschnitten
 - **Selbstsignierte / DDEV-Zertifikate akzeptieren** — nur für lokale Entwicklung
 
 ## Voraussetzungen

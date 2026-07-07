@@ -22,6 +22,9 @@ import java.util.Set;
  */
 final class Occurrences {
 
+    /** Fallback context width (chars per side) when no explicit width is given. */
+    static final int DEFAULT_CONTEXT = 60;
+
     /** A single occurrence to (optionally) tag: {@code [start, end)} is the base name span. */
     static final class Match {
         final int start;
@@ -103,6 +106,14 @@ final class Occurrences {
      * (longest term wins, since {@code terms} is sorted longest-first).
      */
     static List<Match> find(String doc, Set<String> skipElements, List<String> terms) {
+        return find(doc, skipElements, terms, DEFAULT_CONTEXT);
+    }
+
+    /**
+     * As {@link #find(String, Set, List)}, but with an explicit preview context width
+     * ({@code contextChars} characters shown on each side of the base name).
+     */
+    static List<Match> find(String doc, Set<String> skipElements, List<String> terms, int contextChars) {
         List<Match> matches = new ArrayList<Match>();
         if (doc == null || doc.isEmpty() || terms.isEmpty()) {
             return matches;
@@ -120,7 +131,7 @@ final class Occurrences {
                     lt = n;
                 }
                 if (!enclosedByTarget(stack, skipElements)) {
-                    scanRun(doc, i, lt, terms, matches);
+                    scanRun(doc, i, lt, terms, matches, contextChars);
                 }
                 i = lt;
             }
@@ -200,7 +211,8 @@ final class Occurrences {
     }
 
     /** Find term matches inside the text run {@code doc[from, to)} and add non-overlapping ones. */
-    private static void scanRun(String doc, int from, int to, List<String> terms, List<Match> matches) {
+    private static void scanRun(String doc, int from, int to, List<String> terms,
+                                List<Match> matches, int contextChars) {
         String run = doc.substring(from, to);
         for (String term : terms) {
             int idx = 0;
@@ -213,7 +225,7 @@ final class Occurrences {
                 int end = start + term.length();
                 if (boundaryBefore(doc, start) && genitiveOrBoundaryAfter(doc, end)
                         && !overlaps(matches, start, end)) {
-                    matches.add(new Match(start, end, term, snippet(doc, start, end)));
+                    matches.add(new Match(start, end, term, snippet(doc, start, end, contextChars)));
                 }
                 idx = p + 1;
             }
@@ -256,9 +268,19 @@ final class Occurrences {
         return false;
     }
 
-    private static String snippet(String doc, int start, int end) {
-        int a = Math.max(0, start - 28);
-        int b = Math.min(doc.length(), end + 28);
+    private static String snippet(String doc, int start, int end, int ctx) {
+        int a = Math.max(0, start - ctx);
+        int b = Math.min(doc.length(), end + ctx);
+        // don't slice a word in half at the edges: extend outward to the word boundary,
+        // bounded so a very long token can't blow up the preview.
+        int lo = Math.max(0, a - 20);
+        while (a > lo && isNameChar(doc.charAt(a - 1))) {
+            a--;
+        }
+        int hi = Math.min(doc.length(), b + 20);
+        while (b < hi && isNameChar(doc.charAt(b))) {
+            b++;
+        }
         String before = collapse(doc.substring(a, start).replaceAll("<[^>]*>", " "));
         String base = doc.substring(start, end);
         String after = collapse(doc.substring(end, b).replaceAll("<[^>]*>", " "));

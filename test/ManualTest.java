@@ -322,6 +322,18 @@ public class ManualTest {
         java.util.List<Occurrences.Match> ms3 =
                 Occurrences.find(doc3, skip, Occurrences.terms(basel, "Basel"));
         check("place occurrences", "2", String.valueOf(ms3.size()));
+
+        // configurable preview context: a wider window shows more surrounding text and
+        // never cuts a word at the edge (the base name stays wrapped in «…»).
+        String doc4 = "<p>Weiterhin korrespondierte Emil Brunner ausfuehrlich mit Karl Barth "
+                + "ueber die natuerliche Theologie ihrer Zeit.</p>";
+        java.util.List<String> tBarth = Occurrences.terms(barth, "Karl Barth");
+        String narrow = Occurrences.find(doc4, skip, tBarth, 20).get(0).snippet;
+        String wide = Occurrences.find(doc4, skip, tBarth, 120).get(0).snippet;
+        check("wide context is longer", "true", String.valueOf(wide.length() > narrow.length()));
+        check("base name wrapped", "true", String.valueOf(wide.contains("«Karl Barth»")));
+        check("no cut word at edge", "true",
+                String.valueOf(wide.contains("Weiterhin") && wide.contains("Zeit")));
     }
 
     // --- Config: recent picks (MRU) -----------------------------------------

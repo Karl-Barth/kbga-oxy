@@ -34,6 +34,8 @@ final class SettingsDialog {
         JCheckBox scan = new JCheckBox(
                 "Nach weiteren Vorkommen im Text fragen (Akteure/Orte, Text-Modus)",
                 config.isScanOccurrences());
+        JSpinner context = new JSpinner(new SpinnerNumberModel(
+                config.getContextChars(), Config.CONTEXT_MIN, Config.CONTEXT_MAX, 10));
         JTextField templateField = new JTextField(config.getTemplate(), 18);
         JTextArea mappingArea = new JTextArea(config.getMappingRaw(), 4, 24);
         mappingArea.setLineWrap(false);
@@ -63,6 +65,8 @@ final class SettingsDialog {
         c.gridx = 1; c.gridy = y++; c.fill = GridBagConstraints.HORIZONTAL;
         form.add(scan, c);
 
+        addRow(form, c, y++, "Vorschau-Kontext (Zeichen/Seite):", context);
+
         c.gridx = 1; c.gridy = y++; c.fill = GridBagConstraints.HORIZONTAL;
         form.add(insecure, c);
 
@@ -83,6 +87,7 @@ final class SettingsDialog {
             config.setPerPage(((Number) perPage.getValue()).intValue());
             config.setInsecureTls(insecure.isSelected());
             config.setScanOccurrences(scan.isSelected());
+            config.setContextChars(((Number) context.getValue()).intValue());
             config.setTemplate(templateField.getText().trim());
             config.setMappingRaw(mappingArea.getText());
             return true;
