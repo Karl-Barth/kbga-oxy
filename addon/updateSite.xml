@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xt:extensions xmlns:xt="http://www.oxygenxml.com/ns/extension">
     <xt:extension id="ch.kr.kbga.oxy">
-        <xt:location href="../dist/kbga-oxy-1.1.5.zip"/>
+        <xt:location href="https://github.com/Karl-Barth/kbga-oxy/releases/download/v1.1.5/kbga-oxy-1.1.5.zip"/>
         <xt:version>1.1.5</xt:version>
         <xt:oxy_version>22.0+</xt:oxy_version>
         <xt:type>plugin</xt:type>
