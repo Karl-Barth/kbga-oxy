@@ -11,7 +11,7 @@ cd "$HERE"
 
 OXYGEN_DIR="${OXYGEN_DIR:-/Applications/Oxygen XML Editor}"
 LIB_DIR="$OXYGEN_DIR/lib"
-VERSION="1.1.4"
+VERSION="1.1.5"
 JAR_NAME="kbga-oxy-${VERSION}.jar"
 
 if [ ! -f "$LIB_DIR/oxygen.jar" ]; then

@@ -30,6 +30,7 @@ public class ManualTest {
         testTextMode();
         testSelectionWrap();
         testAuthorWrap();
+        testRetag();
         testRegisters();
         testElementFor();
         testReferences();
@@ -145,6 +146,39 @@ public class ManualTest {
         boolean ok = after.contains("<bibl ") && after.contains("corresp=\"kbga-songs-247\"")
                 && after.contains("type=\"song\"");
         check("song corresp+type written", "true", String.valueOf(ok));
+    }
+
+    // --- Retagging an existing element across registers ---------------------
+
+    private static void testRetag() throws Exception {
+        // persName(@ref) -> placeName(@ref): rename element, same attribute
+        WSEditor ed = editor("<p>Ort <persName ref=\"kbga-actors-1\">Basel</persName>.</p>",
+                "<p>Ort <persName ref=\"kbga-actors-1\">Ba".length(), -1);
+        RefTargets.RefTarget t = RefTargets.locate(ed);
+        if (t == null) { fail("retag: no target located"); return; }
+        check("retag located persName", "persName", t.elementName());
+        t.renameElementTo("placeName");
+        t.setAttribute("ref", "kbga-places-5");
+        String after = lastDoc.getText(0, lastDoc.getLength());
+        check("persName -> placeName (start tag)", "true",
+                String.valueOf(after.contains("<placeName ") && after.contains("ref=\"kbga-places-5\"")));
+        check("persName -> placeName (end tag)", "true",
+                String.valueOf(after.contains(">Basel</placeName>")));
+        check("no persName left", "true", String.valueOf(!after.contains("persName")));
+
+        // persName(@ref) -> bibl(@corresp): rename + drop the now-stale @ref, set @corresp
+        WSEditor ed2 = editor("<p>x <persName ref=\"kbga-actors-1\">Titel</persName>.</p>",
+                "<p>x <persName ref=\"kbga-actors-1\">Ti".length(), -1);
+        RefTargets.RefTarget t2 = RefTargets.locate(ed2);
+        if (t2 == null) { fail("retag2: no target located"); return; }
+        t2.renameElementTo("bibl");
+        t2.removeAttribute("ref");
+        t2.setAttribute("corresp", "kbga-bibls-9");
+        String after2 = lastDoc.getText(0, lastDoc.getLength());
+        check("persName -> bibl retagged", "true",
+                String.valueOf(after2.contains("<bibl ") && after2.contains(">Titel</bibl>")));
+        check("stale @ref removed", "true",
+                String.valueOf(!after2.contains("ref=\"kbga-actors-1\"") && after2.contains("corresp=\"kbga-bibls-9\"")));
     }
 
     // --- Registers ----------------------------------------------------------

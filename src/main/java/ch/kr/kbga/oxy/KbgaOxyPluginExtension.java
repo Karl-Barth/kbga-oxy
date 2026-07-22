@@ -150,6 +150,23 @@ public class KbgaOxyPluginExtension
         }
         try {
             Registers.Register reg = Registers.get(chosen.register);
+            Registers.Register old = Registers.get(target.register());
+            // If the picked entity belongs to a different element than the one under the caret
+            // (e.g. a place chosen on an existing <persName>), retag the element to match…
+            String wantElement = Registers.elementFor(chosen);
+            if (!wantElement.equals(target.elementName())) {
+                target.renameElementTo(wantElement);
+            }
+            // …and drop attributes that no longer apply (e.g. @ref when switching to @corresp,
+            // or a stale type="song" when leaving the songs register).
+            if (!old.attribute.equals(reg.attribute)) {
+                target.removeAttribute(old.attribute);
+            }
+            for (String staleKey : old.extraAttributes.keySet()) {
+                if (!reg.extraAttributes.containsKey(staleKey)) {
+                    target.removeAttribute(staleKey);
+                }
+            }
             target.setAttribute(reg.attribute, config.formatRef(chosen));
             for (Map.Entry<String, String> extra : reg.extraAttributes.entrySet()) {
                 target.setAttribute(extra.getKey(), extra.getValue());

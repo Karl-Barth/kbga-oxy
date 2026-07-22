@@ -49,6 +49,10 @@ final class RefTargets {
         String currentRef(String attr);
         /** Set/replace attribute {@code name} with {@code value}. */
         void setAttribute(String name, String value) throws Exception;
+        /** Rename the element to {@code elementName} (no-op if already named so). */
+        void renameElementTo(String elementName) throws Exception;
+        /** Remove attribute {@code name} if present (no-op otherwise). */
+        void removeAttribute(String name) throws Exception;
     }
 
     /**
@@ -233,14 +237,24 @@ final class RefTargets {
     private static RefTarget locateAuthor(WSAuthorEditorPage page, Map<String, String> mapping) {
         try {
             AuthorDocumentController ctrl = page.getDocumentController();
-            int offset = page.getSelectionStart();
+            int offset = balancedStart(page, page.getSelectionStart(), page.getSelectionEnd());
+            // getSelectedText() reports the visual selection reliably; ctrl.getText on the node's
+            // offsets can read the wrong region with pretty-printed mixed content (see selectionAuthor).
+            String selected = null;
+            try {
+                if (page.hasSelection()) {
+                    selected = page.getSelectedText();
+                }
+            } catch (Exception ignore) {
+                // no reliable selection text — fall back to the element's own text
+            }
             AuthorNode node = ctrl.getNodeAtOffset(offset);
             while (node != null) {
                 if (node instanceof AuthorElement) {
                     String ln = localName(node.getName());
                     String register = mapping.get(ln);
                     if (register != null) {
-                        return new AuthorRefTarget(ctrl, (AuthorElement) node, ln, register);
+                        return new AuthorRefTarget(ctrl, (AuthorElement) node, ln, register, selected);
                     }
                 }
                 node = node.getParent();
@@ -256,18 +270,24 @@ final class RefTargets {
         private final AuthorElement el;
         private final String name;
         private final String register;
+        private final String selectedText; // reliable visual selection, or null
 
-        AuthorRefTarget(AuthorDocumentController ctrl, AuthorElement el, String name, String register) {
+        AuthorRefTarget(AuthorDocumentController ctrl, AuthorElement el, String name, String register,
+                        String selectedText) {
             this.ctrl = ctrl;
             this.el = el;
             this.name = name;
             this.register = register;
+            this.selectedText = selectedText;
         }
 
         public String register() { return register; }
         public String elementName() { return name; }
 
         public String currentText() {
+            if (selectedText != null && !selectedText.trim().isEmpty()) {
+                return collapse(selectedText);
+            }
             try {
                 int start = el.getStartOffset();
                 int len = el.getEndOffset() - start;
@@ -285,6 +305,16 @@ final class RefTargets {
         public void setAttribute(String name, String value) {
             ctrl.setAttribute(name, new AttrValue(value), el);
         }
+
+        public void renameElementTo(String elementName) {
+            if (elementName != null && !elementName.equals(localName(el.getName()))) {
+                ctrl.renameElement(el, elementName);
+            }
+        }
+
+        public void removeAttribute(String attrName) {
+            ctrl.removeAttribute(attrName, el);
+        }
     }
 
     private static WrapTarget selectionAuthor(WSAuthorEditorPage page) {
@@ -293,21 +323,59 @@ final class RefTargets {
                 return null;
             }
             AuthorDocumentController ctrl = page.getDocumentController();
-            int start = page.getSelectionStart();
-            int end = page.getSelectionEnd();
-            if (end <= start) {
+            int rawStart = page.getSelectionStart();
+            int rawEnd = page.getSelectionEnd();
+            if (rawEnd <= rawStart) {
                 return null;
             }
-            String sel;
+            // The raw selection offsets from WSAuthorEditorPage don't always line up with the
+            // AuthorDocumentController content model — with pretty-printed mixed content (e.g. a
+            // <persName> inside an indented <note>/<bibl>) they point at a different range, so
+            // feeding them straight into surroundInFragment wraps the wrong text ("one line
+            // below"). getBalancedSelection maps them to valid content offsets — the same step
+            // oXygen's own surround operations perform before surroundInFragment.
+            int start = rawStart;
+            int end = rawEnd;
             try {
-                sel = ctrl.getText(start, end - start);
-            } catch (Exception e) {
-                sel = "";
+                int[] bal = page.getBalancedSelection(rawStart, rawEnd);
+                if (bal != null && bal.length == 2 && bal[1] > bal[0]) {
+                    start = bal[0];
+                    end = bal[1];
+                }
+            } catch (Exception ignore) {
+                // keep raw offsets
+            }
+            // getSelectedText() reflects the visual selection reliably; prefer it for the search
+            // pre-fill (ctrl.getText on the offsets can read the wrong region in the case above).
+            String sel = page.getSelectedText();
+            if (sel == null || sel.trim().isEmpty()) {
+                try {
+                    sel = ctrl.getText(start, end - start);
+                } catch (Exception e) {
+                    sel = "";
+                }
             }
             return new AuthorWrapTarget(ctrl, start, end, namespaceAt(ctrl, start), collapse(sel));
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * Map a raw editor selection {@code [rawStart, rawEnd)} to a balanced start offset that is
+     * valid in the {@link AuthorDocumentController} content model. Falls back to {@code rawStart}
+     * if balancing is unavailable. See {@link #selectionAuthor} for why this matters.
+     */
+    private static int balancedStart(WSAuthorEditorPage page, int rawStart, int rawEnd) {
+        try {
+            int[] bal = page.getBalancedSelection(rawStart, Math.max(rawStart, rawEnd));
+            if (bal != null && bal.length == 2) {
+                return bal[0];
+            }
+        } catch (Exception ignore) {
+            // fall through
+        }
+        return rawStart;
     }
 
     /** Namespace URI of the nearest enclosing element, or "" if none/undeclared. */
@@ -486,6 +554,43 @@ final class RefTargets {
             String tag = liveTag();
             int close = tagEnd();
             String newTag = buildTag(tag, name, value);
+            doc.remove(tagStart, close - tagStart + 1);
+            doc.insertString(tagStart, newTag, null);
+        }
+
+        public void renameElementTo(String newName) throws Exception {
+            if (newName == null || newName.equals(name)) {
+                return;
+            }
+            String text = doc.getText(0, doc.getLength());
+            int close = text.indexOf('>', tagStart);
+            if (close < 0) {
+                throw new Exception("Kein Tag-Ende gefunden.");
+            }
+            boolean selfClose = text.charAt(close - 1) == '/';
+            // Rewrite the matching end tag first (it sits after the start tag, so editing the
+            // start-tag name below does not shift the end-tag offset we computed here).
+            if (!selfClose) {
+                int endTag = indexOfCloseTag(text, name, close);
+                if (endTag >= 0) {
+                    int endClose = text.indexOf('>', endTag);
+                    doc.remove(endTag, endClose - endTag + 1);
+                    doc.insertString(endTag, "</" + newName + ">", null);
+                }
+            }
+            // Then rename the element in the start tag: '<' + name -> '<' + newName.
+            doc.remove(tagStart + 1, name.length());
+            doc.insertString(tagStart + 1, newName, null);
+        }
+
+        public void removeAttribute(String attrName) throws Exception {
+            String tag = liveTag();
+            Matcher m = attrPattern(attrName).matcher(tag);
+            if (!m.find()) {
+                return;
+            }
+            int close = tagEnd();
+            String newTag = tag.substring(0, m.start()) + tag.substring(m.end());
             doc.remove(tagStart, close - tagStart + 1);
             doc.insertString(tagStart, newTag, null);
         }
