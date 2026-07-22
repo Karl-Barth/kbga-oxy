@@ -1,0 +1,313 @@
+/* ============================================================================
+   kbga-author.css  —  Author-Modus-Lesedarstellung für KBGA-TEI-Dokumente
+
+   Bildet die Weblese­ansicht (kbga-static.karl-barth.ch, TEI Publisher) im
+   oXygen-Author-Modus nach, damit sich dort komfortabel korrekturlesen lässt.
+   Zusätzlich werden Referenzen sichtbar gemacht: aufgelöste KBGA-IDs dezent,
+   ungelöste/fehlende Referenzen als Warnung — genau die Stellen, die man beim
+   Korrekturlesen prüfen will.
+
+   Ergänzende Author-CSS über oXygens Standard-TEI-Framework (kein eigenes
+   Framework nötig). Anbinden: siehe README / Plugin-Doku.
+
+   Farb-/Typo-Werte übernommen aus der Webversion (src/assets/edition.css):
+     Serif-Lesefont, Zeilenhöhe 1.62, Papier #fbfaf7, Tinte #1a1a1a,
+     Akzentblau #22adeb, Lesebreite ~40rem.
+
+   Bewusst ohne var()/color-mix() geschrieben — oXygens Author-CSS-Engine
+   (ab oXygen 22) unterstützt nur literale Farben + rgba() zuverlässig.
+   ============================================================================ */
+
+/* ===========================================================================
+   1) Seitenfläche & Lesetypografie
+   =========================================================================== */
+
+* {
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+TEI {
+    display: block;
+    background-color: #fbfaf7;
+    color: #1a1a1a;
+}
+
+/* Lesespalte: zentriert, begrenzte Breite, großzügige Zeilenhöhe wie im Web. */
+text {
+    display: block;
+    max-width: 40em;
+    margin: 1.5em auto 4em auto;
+    padding: 0 1.5em;
+    font-size: 1.1em;
+    line-height: 1.62;
+    text-align: left;
+}
+
+body {
+    display: block;
+}
+
+/* ===========================================================================
+   2) teiHeader — beim Korrekturlesen Beiwerk: kompakt & gedämpft
+   =========================================================================== */
+
+teiHeader {
+    display: block;
+    max-width: 40em;
+    margin: 0 auto;
+    padding: .6em 1em;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: .72em;
+    color: #5b5750;
+    background-color: rgba(227, 221, 210, .35);
+    border: 1px solid #e3ddd2;
+    border-radius: 6px;
+}
+teiHeader:before {
+    content: "Metadaten (teiHeader)";
+    display: block;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-size: .9em;
+    margin-bottom: .3em;
+    color: #22adeb;
+}
+teiHeader * {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-style: normal;
+}
+
+/* ===========================================================================
+   3) Struktur: div, head, p
+   =========================================================================== */
+
+div {
+    display: block;
+    margin: 1.2em 0;
+}
+
+/* Dezentes Struktur-Etikett pro div-Typ (nur zur Orientierung) */
+div[type]:before {
+    content: attr(type);
+    display: inline-block;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: .6em;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #5b5750;
+    background-color: rgba(227, 221, 210, .5);
+    padding: .05em .5em;
+    border-radius: .6em;
+    margin-bottom: .4em;
+}
+
+head {
+    display: block;
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-weight: 600;
+    line-height: 1.2;
+    font-size: 1.3em;
+    margin: 1.2em 0 .5em 0;
+    color: #1a1a1a;
+}
+
+p {
+    display: block;
+    margin: 0 0 .85em 0;
+    text-align: justify;
+}
+
+/* ===========================================================================
+   4) Brief-/Korrespondenz-Elemente
+   =========================================================================== */
+
+opener   { display: block; margin: 0 0 1.2em 0; }
+closer   { display: block; margin: 1.5em 0 0 0; text-align: right; }
+dateline { display: block; font-style: italic; color: #5b5750; text-align: right; }
+salute   { display: block; }
+signed   { display: block; margin-top: .3em; font-style: italic; text-align: right; }
+opener salute { font-weight: 600; text-align: left; }
+
+/* ===========================================================================
+   5) Inline-Auszeichnung (hi, title, quote, foreign, term)
+   =========================================================================== */
+
+hi[rend~="italic"]       { font-style: italic; }
+hi[rend~="bold"]         { font-weight: bold; }
+hi[rend~="underline"]    { text-decoration: underline; }
+hi[rend~="sup"],
+hi[rend~="superscript"]  { vertical-align: super; font-size: .8em; }
+hi[rend~="sub"],
+hi[rend~="subscript"]    { vertical-align: sub;   font-size: .8em; }
+hi[rend~="spaced"]       { letter-spacing: .18em; }
+hi[rend~="smallcaps"]    { font-variant: small-caps; }
+
+title   { font-style: italic; }
+quote   { font-style: italic; }
+foreign { font-style: italic; }
+term    { font-style: italic; }
+
+/* Zitat-Blöcke / Motti */
+epigraph, cit {
+    display: block;
+    margin: 1em 2em;
+    color: #5b5750;
+    font-style: italic;
+}
+
+/* Zitate (q) und Verse (lg/l) — im KBGA-Bestand u. a. in Fußnoten (Schiller, «Der Taucher») */
+q { font-style: italic; }
+q[rend~="block"] {
+    display: block;
+    margin: .8em 0 .8em 2em;
+    font-style: italic;
+    color: #3a3630;
+}
+lg {
+    display: block;
+    margin: .8em 0 .8em 2em;
+}
+l {
+    display: block;
+    font-style: italic;
+    color: #3a3630;
+}
+
+/* ===========================================================================
+   6) Referenzen — der Korrekturlese-Kern
+      Aufgelöste KBGA-IDs: dezent blau unterstrichen.
+      Fehlende/ungelöste Referenzen: rot — springen ins Auge.
+   =========================================================================== */
+
+/* Named entities generell leicht markieren */
+persName, placeName, orgName {
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(34, 173, 235, .6);
+}
+
+/* Aufgelöst: @ref beginnt mit kbga- */
+persName[ref^="kbga-"],
+placeName[ref^="kbga-"],
+orgName[ref^="kbga-"] {
+    color: #1f6b8f;
+    border-bottom: 1px dotted #22adeb;
+}
+
+/* Ungelöst: kein @ref → rote Punktlinie */
+persName:not([ref]),
+placeName:not([ref]),
+orgName:not([ref]) {
+    color: #c0392b;
+    border-bottom: 2px dotted #c0392b;
+}
+
+/* Literatur/Lieder */
+bibl {
+    border-bottom: 1px dotted rgba(34, 173, 235, .5);
+}
+bibl[corresp^="kbga-"] {
+    border-bottom: 1px dotted #22adeb;
+}
+bibl[type="song"]:after {
+    content: " \266A";   /* ♪ */
+    color: #22adeb;
+    font-size: .85em;
+}
+/* Explizit nicht gefundene Literatur → Warnung */
+bibl[type="not-found-in-kba"] {
+    color: #c0392b;
+    border-bottom: 2px dotted #c0392b;
+}
+bibl[type="not-found-in-kba"]:after {
+    content: " \26A0";   /* ⚠ */
+    color: #c0392b;
+}
+
+/* Bibelstellen (kanonische Referenzen) */
+ref[type="can"][subtype="bible"] {
+    color: #2a5f7a;
+    font-variant: small-caps;
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(34, 173, 235, .45);
+}
+
+/* Externe Links (KBA-Objekte etc.) */
+ref[target^="http"] {
+    color: #22adeb;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(34, 173, 235, .35);
+}
+
+/* Datum inline dezent */
+date {
+    color: #5b5750;
+}
+
+/* ===========================================================================
+   7) Fußnoten / Anmerkungen (note)
+      Im Web Fußnote/Popover; hier kleiner, abgesetzter Block.
+   =========================================================================== */
+
+note {
+    display: block;
+    margin: .6em 0;
+    padding: .3em .7em;
+    font-size: .84em;
+    line-height: 1.4;
+    color: #5b5750;
+    border-left: 3px solid #e3ddd2;
+    background-color: rgba(227, 221, 210, .22);
+}
+note:before {
+    content: "Anm. " attr(n);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: .82em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #22adeb;
+    margin-right: .5em;
+}
+note[place="inline"] {
+    display: inline;
+    border-left: none;
+    background: none;
+    padding: 0;
+    font-size: .9em;
+}
+
+/* ===========================================================================
+   8) Seiten- & Zeilenumbrüche
+   =========================================================================== */
+
+pb {
+    display: inline;
+}
+pb:before {
+    content: "| " attr(n);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: .7em;
+    color: #5b5750;
+    background-color: rgba(227, 221, 210, .5);
+    padding: 0 .35em;
+    border-radius: .5em;
+    margin: 0 .3em;
+    vertical-align: .1em;
+}
+
+lb {
+    display: inline;
+}
+lb:before {
+    content: "\A";
+    white-space: pre;
+}
+
+/* ===========================================================================
+   9) Listen
+   =========================================================================== */
+
+list  { display: block; margin: .6em 0 .6em 1.2em; }
+item  { display: list-item; margin: .2em 0; }
+label { font-weight: 600; }

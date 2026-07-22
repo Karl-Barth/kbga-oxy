@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  oXygen Framework Extension Script (oXygen 23.0+).
+
+  Extends the built-in "TEI P5" document type with an OPT-IN "KBGA Lesefont"
+  alternate Author-mode stylesheet for comfortable proof-reading. Because this
+  is an *extension* (base="TEI P5"), the built-in TEI framework's schema,
+  validation and Author actions stay fully intact — only the alternate CSS is
+  added. Editors switch it on via the Author toolbar "Styles" menu.
+
+  Packaged as an add-on (see ../make-framework-addon.sh). Requires oXygen 23.0+
+  (the hand-authorable framework extension script was introduced in 23.0; on
+  oXygen 22 the equivalent must be produced via the GUI "Extend" action).
+-->
+<script xmlns="http://www.oxygenxml.com/ns/framework/extend"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.oxygenxml.com/ns/framework/extend http://www.oxygenxml.com/ns/framework/extend/frameworkExtensionScript.xsd"
+        base="TEI P5">
+    <name>KBGA Leseansicht</name>
+    <description>Fügt dem TEI-P5-Author-Modus eine opt-in „KBGA Lesefont“-Alternativ-CSS
+        für komfortables Korrekturlesen hinzu (Weblese-Ansicht nachgebildet, ungetaggte/ungelöste
+        Referenzen farbig hervorgehoben). Schema, Validierung und Aktionen des TEI-Frameworks
+        bleiben unangetastet.</description>
+    <priority>High</priority>
+    <author>
+        <css>
+            <addCss path="${framework}/css/kbga-author.css" title="KBGA Lesefont" alternate="true"/>
+        </css>
+    </author>
+</script>

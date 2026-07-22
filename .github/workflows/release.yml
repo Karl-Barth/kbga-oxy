@@ -61,9 +61,20 @@ jobs:
           jar cf "dist/$PKG/lib/kbga-oxy-$V.jar" -C build/classes .
           (cd dist && zip -r -q "$PKG.zip" "$PKG")
 
-          # Add-on descriptor pointing at this release's zip asset (printf avoids
-          # heredoc-indentation pitfalls inside the YAML run block).
+          # Package the TEI reading-view framework add-on (extension script + CSS).
+          # Independently versioned; extends TEI P5 with an opt-in Author CSS (oXygen 23.0+).
+          FW_V="1.0.0"
+          FW_PKG="kbga-reading-view"
+          mkdir -p "dist/$FW_PKG/css"
+          cp framework/kbga-reading-view.xml "dist/$FW_PKG/kbga-reading-view.xml"
+          cp author-css/kbga-author.css      "dist/$FW_PKG/css/kbga-author.css"
+          (cd dist && zip -r -q "$FW_PKG-$FW_V.zip" "$FW_PKG")
+
+          # ONE update site advertising BOTH add-ons; oXygen filters each by oxy_version
+          # (so oXygen 22 installs only the plugin, 23+ sees the framework too). printf
+          # avoids heredoc-indentation pitfalls inside the YAML run block.
           ZIP_URL="$SERVER/$REPO/releases/download/v$V/$PKG.zip"
+          FW_ZIP_URL="$SERVER/$REPO/releases/download/v$V/$FW_PKG-$FW_V.zip"
           {
             printf '%s\n' '<?xml version="1.0" encoding="UTF-8"?>'
             printf '%s\n' '<xt:extensions xmlns:xt="http://www.oxygenxml.com/ns/extension">'
@@ -77,6 +88,18 @@ jobs:
             printf '%s\n' '        <xt:description><html xmlns="http://www.w3.org/1999/xhtml"><body>'
             printf '%s\n' '            <p>Sucht Akteure, Orte, Literatur und Lieder live in der KBGA-Metadatenbank'
             printf '%s\n' '            und schreibt die id in das passende Attribut (ref/corresp) des Elements unter dem Cursor.</p>'
+            printf '%s\n' '        </body></html></xt:description>'
+            printf '%s\n' '    </xt:extension>'
+            printf '%s\n' '    <xt:extension id="ch.kr.kbga.reading-view">'
+            printf '        <xt:location href="%s"/>\n' "$FW_ZIP_URL"
+            printf '        <xt:version>%s</xt:version>\n' "$FW_V"
+            printf '%s\n' '        <xt:oxy_version>23.0+</xt:oxy_version>'
+            printf '%s\n' '        <xt:type>framework</xt:type>'
+            printf '%s\n' '        <xt:author>K-R / KBGA</xt:author>'
+            printf '%s\n' '        <xt:name>KBGA Leseansicht (TEI-Author-CSS)</xt:name>'
+            printf '%s\n' '        <xt:description><html xmlns="http://www.w3.org/1999/xhtml"><body>'
+            printf '%s\n' '            <p>Opt-in Lese-CSS fuer den TEI-Author-Modus (Korrekturlesen); erweitert das'
+            printf '%s\n' '            eingebaute TEI-P5-Framework nicht-brechend. Benoetigt oXygen 23.0+.</p>'
             printf '%s\n' '        </body></html></xt:description>'
             printf '%s\n' '    </xt:extension>'
             printf '%s\n' '</xt:extensions>'
@@ -96,4 +119,5 @@ jobs:
         with:
           files: |
             dist/kbga-oxy-${{ steps.v.outputs.version }}.zip
+            dist/kbga-reading-view-1.0.0.zip
             dist/updateSite.xml
