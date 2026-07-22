@@ -6,4 +6,6 @@ public interface WSAuthorEditorPage extends WSEditorPage {
     int getSelectionStart();
     int getSelectionEnd();
     boolean hasSelection();
+    String getSelectedText();
+    int[] getBalancedSelection(int startOffset, int endOffset);
 }

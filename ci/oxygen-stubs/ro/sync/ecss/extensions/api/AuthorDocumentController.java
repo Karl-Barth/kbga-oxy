@@ -7,4 +7,6 @@ public interface AuthorDocumentController {
     void setAttribute(String attributeName, AttrValue value, AuthorElement element);
     String getText(int offset, int length) throws javax.swing.text.BadLocationException;
     void surroundInFragment(String xmlFragment, int startOffset, int endOffset) throws Exception;
+    void renameElement(AuthorElement element, String name);
+    void removeAttribute(String attributeName, AuthorElement element);
 }
